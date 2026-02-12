@@ -13,12 +13,10 @@
         :root { --color-teal: #00BFA5; --font-pretendard: 'Pretendard', sans-serif; }
         body { font-family: var(--font-pretendard); background-color: #FFFFFF; color: #191F28; -webkit-font-smoothing: antialiased; }
         
-        /* 기존의 생동감 넘치는 애니메이션 계승 */
         @keyframes pulse-attention { 0%, 100% { transform: scale(1); box-shadow: 0 4px 12px rgba(0, 191, 165, 0.2); } 50% { transform: scale(1.03); box-shadow: 0 0 0 4px rgba(0, 191, 165, 0.15); } }
         .animate-pulse-attention { animation: pulse-attention 2.5s infinite cubic-bezier(0.4, 0, 0.2, 1); }
-        .result-card { background-color: #F7F9FB; border-radius: 20px; transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
+        .result-card { background-color: #F7F9FB; border-radius: 20px; transition: all 0.4s ease; }
         
-        /* 편도/계산 전환 플립 효과 */
         .perspective-1000 { perspective: 1000px; }
         .flip-card-inner { transition: transform 0.6s; transform-style: preserve-3d; position: relative; }
         .is-flipped { transform: rotateY(180deg); }
@@ -30,159 +28,120 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useRef } = React;
+        const { useState, useEffect } = React;
 
-        // 2026년 개정 데이터
-        const CONFIG_2026 = {
-            DAILY_OUT: 25000,   // 관외 일비 (25,000원)
-            MEAL_OUT: 25000,    // 관외 식비
-            DAILY_IN: 20000,    // 관내 일비 (4시간 이상)
-            BUS_RATE: 168.6,    // 시외버스 표준 요율
-            BASE_FARE: 1800,    // 기본 운임
-            SERVICE_KEY: "47a79741c5cfeead2314a79c59b1c6114705107cc1066d9cd366a2d9333e5422"
+        // 2026년 전남 교육행정 여비 규정 데이터
+        const CONFIG = {
+            OUT_DAILY: 25000,   // 관외 일비
+            OUT_MEAL: 25000,    // 관외 식비
+            IN_DAILY_LONG: 20000, // 관내 (4시간 이상)
+            IN_DAILY_SHORT: 10000, // 관내 (4시간 미만)
+            BUS_RATE: 168.6,
+            BASE_FARE: 1800
         };
 
-        const FERRY_FARE_MAP = { "흑산": 20550, "하의": 5930, "신의": 5930, "비금": 10500, "도초": 10500 };
-
         const App = () => {
-            const [origin, setOrigin] = useState('광주');
+            const [origin, setOrigin] = useState('');
             const [destination, setDestination] = useState('');
+            const [travelType, setTravelType] = useState('OUT'); // 'IN' 또는 'OUT'
             const [distance, setDistance] = useState(0);
-            const [isFlipped, setIsFlipped] = useState(false); // 편도 vs 계산기 전환 상태
+            const [isFlipped, setIsFlipped] = useState(false);
             
-            // 감액 상태 (기존 Toggle 방식 계승)
-            const [deductions, setDeductions] = useState({ gov_vehicle: false, meal_count: 0 });
+            const [deductions, setDeductions] = useState({
+                gov_vehicle: false,
+                short_time: false, // 관내 4시간 미만용
+                meal_count: 0
+            });
 
-            // API 연동을 통한 거리 조회
-            const fetchDistance = async () => {
-                if (!destination) return;
-                // 실제 배포 시에는 API 연동 코드가 위치하는 곳입니다.
-                // 현재는 로직 테스트를 위해 임의의 거리(예: 75km)를 할당하거나 직접 입력을 허용합니다.
-                alert("API를 통해 실시간 거리를 조회합니다.");
+            const calculate = () => {
+                let daily = 0;
+                let meal = 0;
+
+                if (travelType === 'OUT') {
+                    daily = CONFIG.OUT_DAILY;
+                    if (deductions.gov_vehicle) daily = daily / 2; // 관외 관용차 50% 감액
+                    meal = CONFIG.OUT_MEAL - (deductions.meal_count * (CONFIG.OUT_MEAL / 3));
+                } else {
+                    daily = deductions.short_time ? CONFIG.IN_DAILY_SHORT : CONFIG.IN_DAILY_LONG;
+                    if (deductions.gov_vehicle) daily = daily - 10000; // 관내 관용차 1만원 감액
+                    meal = 0;
+                }
+
+                // 거리 기반 교통비 (km당 요율 계산)
+                const transport = Math.round((CONFIG.BASE_FARE + (distance > 10 ? (distance - 10) * CONFIG.BUS_RATE : 0)) / 100) * 100;
+
+                return { daily, meal, transport: transport * 2, total: daily + meal + (transport * 2) };
             };
 
-            const calculateCosts = () => {
-                const isInterCity = distance > 12; // 12km 초과 시 관외 판정
-                
-                // 1. 일비 (관용차 이용 시 50% 감액)
-                let daily = isInterCity ? CONFIG_2026.DAILY_OUT : CONFIG_2026.DAILY_IN;
-                if (deductions.gov_vehicle) daily = isInterCity ? daily / 2 : daily - 10000;
-
-                // 2. 식비 (제공 식수만큼 감액)
-                let meal = isInterCity ? CONFIG_2026.MEAL_OUT - (deductions.meal_count * (CONFIG_2026.MEAL_OUT / 3)) : 0;
-
-                // 3. 교통비 (km당 요율 계산 및 사사오입)
-                const oneWayBus = Math.round((CONFIG_2026.BASE_FARE + (distance > 10 ? (distance - 10) * CONFIG_2026.BUS_RATE : 0)) / 100) * 100;
-                
-                // 4. 승선료 자동 합산
-                let ferry = 0;
-                Object.keys(FERRY_FARE_MAP).forEach(island => {
-                    if (destination.includes(island)) ferry = FERRY_FARE_MAP[island] * 2;
-                });
-
-                return { daily, meal, transport: oneWayBus * 2, ferry, total: daily + meal + (oneWayBus * 2) + ferry, oneWayBus };
-            };
-
-            const costs = calculateCosts();
+            const costs = calculate();
 
             return (
                 <div className="max-w-[480px] mx-auto p-5 min-h-screen">
-                    <header className="text-center mb-10 mt-6">
-                        <h1 className="text-2xl font-bold tracking-tight text-gray-900">yeobi_easy for KOR</h1>
-                        <span className="text-[10px] font-bold text-teal-500 bg-teal-50 px-2 py-0.5 rounded-full mt-2 inline-block">2026 신규 지침 적용</span>
+                    <header className="text-center mb-8">
+                        <h1 className="text-2xl font-bold text-gray-900">yeobi_easy for KOR</h1>
+                        <p className="text-[10px] font-bold text-teal-500 mt-1">2026 전라남도교육청 여비 규정 준수</p>
                     </header>
 
-                    {/* 입력부 */}
-                    <div className="space-y-4 mb-8">
-                        <div className="bg-gray-50 p-4 rounded-2xl border border-transparent focus-within:border-teal-500 transition-all">
-                            <label className="block text-[10px] font-bold text-gray-400 mb-1">도착지 검색</label>
-                            <input 
-                                type="text" 
-                                className="w-full bg-transparent outline-none font-bold text-lg" 
-                                placeholder="예: 남악, 흑산도, 서울 등"
-                                value={destination}
-                                onChange={(e) => setDestination(e.target.value)}
-                            />
+                    <div className="space-y-4 mb-6">
+                        <div className="bg-gray-50 p-4 rounded-2xl">
+                            <label className="block text-[10px] font-bold text-gray-400 mb-1">출발지 (시/군/구/읍/동)</label>
+                            <input type="text" className="w-full bg-transparent outline-none font-bold text-lg" placeholder="예: 함평군, 동작구" value={origin} onChange={e => setOrigin(e.target.value)} />
                         </div>
                         <div className="bg-gray-50 p-4 rounded-2xl">
-                            <label className="block text-[10px] font-bold text-gray-400 mb-1">운행 거리 (km)</label>
-                            <input 
-                                type="number" 
-                                className="w-full bg-transparent outline-none font-bold text-lg" 
-                                value={distance}
-                                onChange={(e) => setDistance(parseFloat(e.target.value))}
-                            />
+                            <label className="block text-[10px] font-bold text-gray-400 mb-1">목적지 (시/군/구/읍/동)</label>
+                            <input type="text" className="w-full bg-transparent outline-none font-bold text-lg" placeholder="예: 문내면, 세종시" value={destination} onChange={e => setDestination(e.target.value)} />
+                        </div>
+                        <div className="flex gap-2">
+                            <button onClick={() => setTravelType('IN')} className={`flex-1 p-3 rounded-xl font-bold text-sm ${travelType === 'IN' ? 'bg-teal-500 text-white' : 'bg-gray-100 text-gray-400'}`}>관내 출장</button>
+                            <button onClick={() => setTravelType('OUT')} className={`flex-1 p-3 rounded-xl font-bold text-sm ${travelType === 'OUT' ? 'bg-teal-500 text-white' : 'bg-gray-100 text-gray-400'}`}>관외 출장</button>
+                        </div>
+                        <div className="bg-gray-50 p-4 rounded-2xl">
+                            <label className="block text-[10px] font-bold text-gray-400 mb-1">편도 거리 (km) - 교통비 산출용</label>
+                            <input type="number" className="w-full bg-transparent outline-none font-bold text-lg" value={distance} onChange={e => setDistance(parseFloat(e.target.value) || 0)} />
                         </div>
                     </div>
 
-                    {/* 결과 카드 (Flip 기능 포함) */}
-                    <div className="perspective-1000 h-[400px] mb-10">
+                    <div className="perspective-1000 h-[380px] mb-6">
                         <div className={`flip-card-inner h-full ${isFlipped ? 'is-flipped' : ''}`}>
-                            
-                            {/* FRONT: 편도 교통비 정보 */}
+                            {/* FRONT: 요약 내역 */}
                             <div className="flip-card-front h-full result-card p-8 flex flex-col justify-between border border-gray-100 shadow-xl">
-                                <div>
-                                    <div className="flex justify-between items-start mb-6">
-                                        <span className="text-sm font-bold text-teal-600">기본 정보 (편도)</span>
-                                        <button onClick={() => setIsFlipped(true)} className="bg-teal-500 text-white text-[11px] font-bold px-3 py-1.5 rounded-full animate-pulse-attention">여비 계산기로 전환</button>
-                                    </div>
-                                    <div className="text-center py-6 border-y border-dashed border-gray-200">
-                                        <p className="text-xs text-gray-400 mb-1">{origin} → {destination || '도착지'}</p>
-                                        <h2 className="text-4xl font-black text-gray-900">{costs.oneWayBus.toLocaleString()}<span className="text-lg font-medium ml-1">원</span></h2>
-                                    </div>
+                                <div className="text-center">
+                                    <span className="text-[10px] font-bold text-teal-600 bg-teal-50 px-2 py-1 rounded-full">{travelType === 'IN' ? '관내' : '관외'} 여비 요약</span>
+                                    <h2 className="text-4xl font-black text-gray-900 mt-6">{costs.total.toLocaleString()}<span className="text-lg font-medium ml-1">원</span></h2>
+                                    <p className="text-xs text-gray-400 mt-2">{origin || '미정'} ↔ {destination || '미정'}</p>
                                 </div>
-                                <div className="bg-white p-4 rounded-xl border border-gray-100">
-                                    <p className="text-[11px] text-gray-500 leading-relaxed">* 이 운임은 2026.01.20 시외버스 표준 요율을 기반으로 자동 산출되었습니다. 실비 정산 시 영수증 금액을 우선 확인해 주세요.</p>
-                                </div>
+                                <button onClick={() => setIsFlipped(true)} className="w-full py-4 bg-teal-500 text-white rounded-2xl font-bold animate-pulse-attention">감액 설정 및 상세 보기</button>
                             </div>
 
-                            {/* BACK: 상세 여비 계산기 */}
-                            <div className="flip-card-back h-full result-card p-8 border-2 border-teal-500/20 shadow-2xl overflow-y-auto">
-                                <div className="flex justify-between items-center mb-6">
-                                    <h3 className="font-bold text-gray-900">관외 여비 계산기</h3>
-                                    <button onClick={() => setIsFlipped(false)} className="text-gray-400 hover:text-gray-600"><span className="text-xs font-bold">뒤로가기</span></button>
+                            {/* BACK: 감액 설정 및 상세 내역 */}
+                            <div className="flip-card-back h-full result-card p-6 border-2 border-teal-500/20 shadow-2xl overflow-y-auto">
+                                <div className="flex justify-between items-center mb-4">
+                                    <h3 className="font-bold text-gray-900 text-sm">감사 대비 상세 설정</h3>
+                                    <button onClick={() => setIsFlipped(false)} className="text-xs font-bold text-gray-400">닫기</button>
+                                </div>
+                                
+                                <div className="space-y-3 mb-6">
+                                    <button onClick={() => setDeductions(p => ({...p, gov_vehicle: !p.gov_vehicle}))} className={`w-full p-3 rounded-xl text-left text-xs font-bold transition-all ${deductions.gov_vehicle ? 'bg-teal-500 text-white' : 'bg-white border border-gray-100 text-gray-600'}`}>관용차량 이용 (일비 감액)</button>
+                                    {travelType === 'IN' ? (
+                                        <button onClick={() => setDeductions(p => ({...p, short_time: !p.short_time}))} className={`w-full p-3 rounded-xl text-left text-xs font-bold transition-all ${deductions.short_time ? 'bg-teal-500 text-white' : 'bg-white border border-gray-100 text-gray-600'}`}>4시간 미만 출장</button>
+                                    ) : (
+                                        <div className="flex items-center justify-between p-3 bg-white rounded-xl border border-gray-100">
+                                            <span className="text-xs font-bold text-gray-600">식사 제공 감액</span>
+                                            <select className="text-xs font-bold outline-none" value={deductions.meal_count} onChange={e => setDeductions(p => ({...p, meal_count: parseInt(e.target.value)}))}>
+                                                <option value="0">0식</option><option value="1">1식</option><option value="2">2식</option><option value="3">3식</option>
+                                            </select>
+                                        </div>
+                                    )}
                                 </div>
 
-                                <div className="space-y-4 mb-6">
-                                    <div className="flex justify-between items-center bg-white p-3 rounded-xl shadow-sm">
-                                        <span className="text-sm font-bold text-gray-600">관용차 이용 (일비 50% 감액)</span>
-                                        <button 
-                                            onClick={() => setDeductions(prev => ({...prev, gov_vehicle: !prev.gov_vehicle}))}
-                                            className={`w-10 h-6 rounded-full relative transition-colors ${deductions.gov_vehicle ? 'bg-teal-500' : 'bg-gray-200'}`}
-                                        >
-                                            <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${deductions.gov_vehicle ? 'translate-x-4' : ''}`}></div>
-                                        </button>
-                                    </div>
-                                    <div className="flex justify-between items-center bg-white p-3 rounded-xl shadow-sm">
-                                        <span className="text-sm font-bold text-gray-600">식사 제공 횟수</span>
-                                        <select 
-                                            className="text-xs font-bold border-none bg-teal-50 text-teal-700 p-1 rounded"
-                                            value={deductions.meal_count}
-                                            onChange={(e) => setDeductions(prev => ({...prev, meal_count: parseInt(e.target.value)}))}
-                                        >
-                                            <option value="0">0식</option><option value="1">1식</option><option value="2">2식</option><option value="3">3식</option>
-                                        </select>
-                                    </div>
-                                </div>
-
-                                <div className="pt-4 border-t border-gray-200 space-y-2">
-                                    <div className="flex justify-between text-xs text-gray-500"><span>일비 (2026 인상분)</span><span>{costs.daily.toLocaleString()}원</span></div>
-                                    <div className="flex justify-between text-xs text-gray-500"><span>식비 (관외 기준)</span><span>{costs.meal.toLocaleString()}원</span></div>
-                                    <div className="flex justify-between text-xs text-gray-500"><span>왕복 교통비 (자동산출)</span><span>{costs.transport.toLocaleString()}원</span></div>
-                                    {costs.ferry > 0 && <div className="flex justify-between text-xs text-blue-500 font-bold"><span>기타교통비 (승선료)</span><span>{costs.ferry.toLocaleString()}원</span></div>}
-                                    <div className="flex justify-between items-center pt-4 mt-2 border-t border-teal-100">
-                                        <span className="font-bold text-gray-900">총 합계</span>
-                                        <span className="text-2xl font-black text-teal-600">{costs.total.toLocaleString()}원</span>
-                                    </div>
+                                <div className="pt-4 border-t border-dashed border-gray-200 text-xs space-y-2">
+                                    <div className="flex justify-between"><span>일비</span><span>{costs.daily.toLocaleString()}원</span></div>
+                                    <div className="flex justify-between"><span>식비</span><span>{costs.meal.toLocaleString()}원</span></div>
+                                    <div className="flex justify-between"><span>왕복 교통비</span><span>{costs.transport.toLocaleString()}원</span></div>
                                 </div>
                             </div>
-
                         </div>
                     </div>
-
-                    <footer className="text-center opacity-30 text-[10px] font-bold mt-10">
-                        yeobi_easy for KOR v3.1 | 2026.01.20 개정 지침 반영
-                    </footer>
                 </div>
             );
         };
