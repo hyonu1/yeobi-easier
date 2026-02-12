@@ -13,6 +13,8 @@
         :root { --color-teal: #00BFA5; --font-pretendard: 'Pretendard', sans-serif; }
         body { font-family: var(--font-pretendard); background-color: #F7F9FB; -webkit-font-smoothing: antialiased; }
         .btn-primary { background-color: var(--color-teal); color: white; transition: all 0.2s; }
+        .animate-pulse-attention { animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.03); } }
         .result-card { background-color: #FFFFFF; border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); }
     </style>
 </head>
@@ -22,86 +24,96 @@
     <script type="text/babel">
         const { useState } = React;
 
-        // 2026 전남 교육행정 여비 규정
+        const API_KEYS = {
+            VWORLD: "9F33F28D-CE1C-3EC7-97B1-02372785C3D5",
+            KAKAO: "abd4c66e871836a5163b02926df8c6f1" // REST API 키
+        };
+
         const CONFIG = {
-            VWORLD_KEY: "9F33F28D-CE1C-3EC7-97B1-02372785C3D5",
-            OUT_DAILY: 25000,   // 관외 일비 인상분
-            OUT_MEAL: 25000,    // 관외 식비
-            IN_DAILY_LONG: 20000, // 관내 (4시간 이상)
-            IN_DAILY_SHORT: 10000 // 관내 (4시간 미만)
+            OUT_DAILY: 25000, OUT_MEAL: 25000, IN_DAILY_LONG: 20000, IN_DAILY_SHORT: 10000
         };
 
         const App = () => {
             const [origin, setOrigin] = useState('');
             const [destination, setDestination] = useState('');
-            const [coords, setCoords] = useState({ start: null, end: null });
+            const [distance, setDistance] = useState(0);
             const [travelType, setTravelType] = useState('OUT');
             const [showDetail, setShowDetail] = useState(false);
             const [deductions, setDeductions] = useState({ gov_vehicle: false, short_time: false, meal_count: 0 });
 
-            // Vworld 주소 -> 좌표 변환 함수
-            const getCoords = async (address, type) => {
-                const url = `https://api.vworld.kr/req/address?service=address&request=getcoord&version=2.0&crs=epsg:4324&address=${encodeURIComponent(address)}&refine=true&simple=false&format=json&type=road&key=${CONFIG.VWORLD_KEY}`;
-                
+            // 1. 주소를 좌표로 변환 (Vworld)
+            const getCoords = async (address) => {
+                const url = `https://api.vworld.kr/req/address?service=address&request=getcoord&version=2.0&crs=epsg:4324&address=${encodeURIComponent(address)}&refine=true&simple=false&format=json&type=both&key=${API_KEYS.VWORLD}`;
+                const res = await fetch(url);
+                const data = await res.json();
+                return data.response.status === "OK" ? data.response.result.point : null;
+            };
+
+            // 2. 좌표로 최적 경로 거리 계산 (Kakao Mobility)
+            const getNaviDistance = async () => {
                 try {
-                    const response = await fetch(url);
-                    const data = await response.json();
-                    if (data.response.status === "OK") {
-                        const { x, y } = data.response.result.point;
-                        setCoords(prev => ({ ...prev, [type]: { x, y } }));
-                        alert(`${address} 좌표 확보 완료: ${x}, ${y}`);
-                    } else {
-                        alert("주소를 정확히 입력해주세요.");
+                    const startPos = await getCoords(origin);
+                    const endPos = await getCoords(destination);
+                    if (!startPos || !endPos) { alert("주소를 확인해주세요."); return; }
+
+                    const url = `https://apis-navi.kakaomobility.com/v1/directions?origin=${startPos.x},${startPos.y}&destination=${endPos.x},${endPos.y}&summary=true`;
+                    const res = await fetch(url, {
+                        headers: { Authorization: `KakaoAK ${API_KEYS.KAKAO}` }
+                    });
+                    const data = await res.json();
+                    
+                    if (data.routes && data.routes[0]) {
+                        const distKm = (data.routes[0].summary.distance / 1000).toFixed(1);
+                        setDistance(distKm);
+                        alert(`최적 경로 탐색 완료: 편도 ${distKm}km`);
                     }
-                } catch (error) {
-                    alert("좌표 변환 중 오류가 발생했습니다.");
-                }
+                } catch (e) { alert("거리 조회 중 오류가 발생했습니다."); }
             };
 
             const costs = (() => {
                 let daily = travelType === 'OUT' ? CONFIG.OUT_DAILY : (deductions.short_time ? CONFIG.IN_DAILY_SHORT : CONFIG.IN_DAILY_LONG);
-                if (deductions.gov_vehicle) daily = travelType === 'OUT' ? daily / 2 : daily - 10000; //
-                let meal = travelType === 'OUT' ? CONFIG.OUT_MEAL - (deductions.meal_count * 8330) : 0; //
-                return { daily, meal, transport: 0 }; // 현재 좌표만 확보한 상태
+                if (deductions.gov_vehicle) daily = travelType === 'OUT' ? daily / 2 : daily - 10000;
+                let meal = travelType === 'OUT' ? CONFIG.OUT_MEAL - (deductions.meal_count * 8330) : 0;
+                let transport = travelType === 'OUT' ? Math.round((1800 + (distance > 10 ? (distance - 10) * 168.6 : 0)) / 100) * 100 * 2 : 0;
+                return { daily, meal, transport, total: daily + meal + transport };
             })();
 
             return (
                 <div className="max-w-[480px] mx-auto p-5 min-h-screen">
                     <header className="text-center mb-8">
                         <h1 className="text-xl font-bold text-gray-900">yeobi_easy for KOR</h1>
-                        <p className="text-[10px] font-bold text-teal-500">Vworld Geocoding Engine</p>
+                        <p className="text-[10px] font-bold text-teal-500">Navigation & Audit Guide</p>
                     </header>
 
-                    <div className="space-y-4 mb-6">
-                        <div className="bg-white p-4 rounded-2xl shadow-sm flex gap-2">
-                            <input type="text" className="flex-1 outline-none font-bold" placeholder="출발지 (읍/면/동)" value={origin} onChange={e => setOrigin(e.target.value)} />
-                            <button onClick={() => getCoords(origin, 'start')} className="text-xs font-bold text-teal-600 bg-teal-50 px-3 py-1 rounded-lg">좌표찾기</button>
-                        </div>
-                        <div className="bg-white p-4 rounded-2xl shadow-sm flex gap-2">
-                            <input type="text" className="flex-1 outline-none font-bold" placeholder="목적지 (읍/면/동)" value={destination} onChange={e => setDestination(e.target.value)} />
-                            <button onClick={() => getCoords(destination, 'end')} className="text-xs font-bold text-teal-600 bg-teal-50 px-3 py-1 rounded-lg">좌표찾기</button>
-                        </div>
+                    <div className="space-y-3 mb-6">
+                        <input className="w-full p-4 rounded-2xl bg-white shadow-sm outline-teal-500 font-bold" placeholder="출발 행정구역 (예: 함평군청)" value={origin} onChange={e=>setOrigin(e.target.value)} />
+                        <input className="w-full p-4 rounded-2xl bg-white shadow-sm outline-teal-500 font-bold" placeholder="도착 행정구역 (예: 목포시청)" value={destination} onChange={e=>setDestination(e.target.value)} />
                         <div className="flex gap-2">
-                            {['IN', 'OUT'].map(type => (
-                                <button key={type} onClick={() => setTravelType(type)} className={`flex-1 p-3 rounded-xl font-bold text-sm ${travelType === type ? 'bg-teal-500 text-white' : 'bg-gray-100 text-gray-400'}`}>{type === 'IN' ? '관내' : '관외'}</button>
-                            ))}
+                            <button onClick={() => setTravelType('IN')} className={`flex-1 p-3 rounded-xl font-bold ${travelType === 'IN' ? 'bg-teal-500 text-white' : 'bg-gray-100 text-gray-400'}`}>관내</button>
+                            <button onClick={() => setTravelType('OUT')} className={`flex-1 p-3 rounded-xl font-bold ${travelType === 'OUT' ? 'bg-teal-500 text-white' : 'bg-gray-100 text-gray-400'}`}>관외</button>
                         </div>
+                        {travelType === 'OUT' && (
+                            <button onClick={getNaviDistance} className="w-full p-3 bg-teal-50 text-teal-600 rounded-xl font-bold text-xs">최적 경로 거리 자동 계산 (Kakao)</button>
+                        )}
                     </div>
 
-                    <div className="result-card p-8 mb-6 text-center">
-                        <span className="text-[10px] font-bold text-gray-400">좌표 기반 여비 가이드</span>
-                        <h2 className="text-3xl font-black text-gray-900 mt-4">좌표 확보 완료</h2>
-                        <p className="text-[10px] text-gray-400 mt-2">출발: {coords.start?.x || '0'}, 도착: {coords.end?.x || '0'}</p>
-                        <button onClick={() => setShowDetail(!showDetail)} className="w-full mt-6 py-4 btn-primary rounded-2xl font-bold text-sm">상세 여비 확인</button>
+                    <div className="result-card p-8 text-center mb-6">
+                        <span className="text-[10px] font-bold text-gray-400">Estimated One-way Distance</span>
+                        <h2 className="text-5xl font-black text-gray-900 mt-4">{travelType === 'OUT' ? distance : 0}<span className="text-xl font-medium ml-1">km</span></h2>
+                        <button onClick={() => setShowDetail(!showDetail)} className="w-full mt-8 py-4 btn-primary rounded-2xl font-bold animate-pulse-attention">여비 상세 계산하기</button>
                     </div>
 
                     {showDetail && (
-                        <div className="bg-white rounded-3xl p-6 shadow-xl border border-teal-50">
-                            <h3 className="font-bold text-gray-800 mb-4">실무 정산 내역</h3>
+                        <div className="bg-white rounded-3xl p-6 shadow-xl border border-teal-50 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                            <div className="flex justify-between items-center mb-6">
+                                <h3 className="font-bold text-gray-800">정산 상세 내역</h3>
+                                <button onClick={() => setDeductions(p=>({...p, gov_vehicle: !p.gov_vehicle}))} className={`px-3 py-1.5 rounded-lg text-[10px] font-bold ${deductions.gov_vehicle ? 'bg-teal-500 text-white' : 'bg-gray-100 text-gray-400'}`}>관용차량</button>
+                            </div>
                             <div className="space-y-3 text-sm">
-                                <div className="flex justify-between"><span>일비 (관용차 {deductions.gov_vehicle ? 'O' : 'X'})</span><span className="font-bold">{costs.daily.toLocaleString()}원</span></div>
-                                <div className="flex justify-between"><span>식비 (감액 {deductions.meal_count}식)</span><span className="font-bold">{costs.meal.toLocaleString()}원</span></div>
-                                <div className="pt-4 border-t border-dashed flex justify-between font-black text-teal-600"><span>예상 합계</span><span>{(costs.daily + costs.meal).toLocaleString()}원</span></div>
+                                <div className="flex justify-between"><span>일비 (2026 개정)</span><span className="font-bold">{costs.daily.toLocaleString()}원</span></div>
+                                <div className="flex justify-between"><span>식비 (관외 기준)</span><span className="font-bold">{costs.meal.toLocaleString()}원</span></div>
+                                <div className="flex justify-between"><span>왕복 교통비 (실비)</span><span className="font-bold">{costs.transport.toLocaleString()}원</span></div>
+                                <div className="pt-4 border-t border-dashed flex justify-between font-black text-teal-600"><span>총 합계</span><span>{costs.total.toLocaleString()}원</span></div>
                             </div>
                         </div>
                     )}
