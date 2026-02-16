@@ -599,8 +599,8 @@
 
                     <main className="flex-1 p-5 pt-8 overflow-y-auto">
                         <div className="space-y-5 mb-8">
-                            <AutocompleteInput placeholder="출발지 (예: 광주)" value={origin} onChange={setOrigin} cityList={ALLOWED_CITIES} onSelect={(city) => { setOrigin(city); const norm = city.replace(/\s/g, ""); if(POPUP_REGIONS[norm]) setModalState({ type: 'origin', data: POPUP_REGIONS[norm] }); else if (destination) performCalculation(city, destination); }} />
-                            <AutocompleteInput placeholder="도착지 (예: 비금)" value={destination} onChange={setDestination} cityList={ALLOWED_CITIES} onSelect={(city) => { setDestination(city); const norm = city.replace(/\s/g, ""); if(POPUP_REGIONS[norm]) setModalState({ type: 'destination', data: POPUP_REGIONS[norm] }); else if (origin) performCalculation(origin, city); }} />
+                            <AutocompleteInput placeholder="출발지 (예: ㄴㅇ, 남악)" value={origin} onChange={setOrigin} cityList={ALLOWED_CITIES} onSelect={(city) => { setOrigin(city); const norm = city.replace(/\s/g, ""); if(POPUP_REGIONS[norm]) setModalState({ type: 'origin', data: POPUP_REGIONS[norm] }); else if (destination) performCalculation(city, destination); }} />
+                            <AutocompleteInput placeholder="도착지 (예: ㄱㅈ, 광주)" value={destination} onChange={setDestination} cityList={ALLOWED_CITIES} onSelect={(city) => { setDestination(city); const norm = city.replace(/\s/g, ""); if(POPUP_REGIONS[norm]) setModalState({ type: 'destination', data: POPUP_REGIONS[norm] }); else if (origin) performCalculation(origin, city); }} />
                             <button onClick={() => performCalculation()} className="btn-metallic-blue w-full h-14 rounded-xl font-bold text-lg flex items-center justify-center gap-2 shadow-lg focus:ring-2 focus:ring-blue-400 outline-none">
                                 <Icons.Search size={22} /> 조회하기
                             </button>
