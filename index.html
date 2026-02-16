@@ -3,79 +3,207 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>yeobi_easy for KOR</title>
-    <!-- Tailwind CSS -->
+    <title>yeobi-easier JHN Edition</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- React & ReactDOM -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <!-- Babel -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <!-- PapaParse (CSV 로더) -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <script>
+        window.tailwind.config = {
+            theme: {
+                extend: {
+                    animation: {
+                        'pulse-spread': 'pulse-spread 2s infinite',
+                        'slide-up': 'slideUpModal 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+                    },
+                    keyframes: {
+                        'pulse-spread': {
+                            '0%': { boxShadow: '0 0 0 0 rgba(20, 184, 166, 0.7)' },
+                            '70%': { boxShadow: '0 0 0 10px rgba(20, 184, 166, 0)' },
+                            '100%': { boxShadow: '0 0 0 0 rgba(20, 184, 166, 0)' },
+                        },
+                        'slideUpModal': {
+                            'from': { transform: 'translateY(30px)', opacity: '0' },
+                            'to': { transform: 'translateY(0)', opacity: '1' }
+                        }
+                    }
+                }
+            }
+        }
+    </script>
     <style>
-        /* Pretendard & SUIT Font */
         @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
         @import url('https://cdn.jsdelivr.net/gh/sunn-us/SUIT/fonts/static/woff2/SUIT.css');
         
         :root {
             --font-suit: 'SUIT', sans-serif;
-            --font-pretendard: 'Pretendard', sans-serif;
-            --color-teal: #00BFA5;
-            --color-bg-card: #F7F9FB;
+            --font-pretendard: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
             --color-text-main: #191F28;
         }
 
         body { 
             font-family: var(--font-pretendard);
-            background-color: #FFFFFF;
+            background-color: #d1d5db;
             color: var(--color-text-main);
-            -webkit-font-smoothing: antialiased;
+            display: flex;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            overflow-x: hidden;
+            scrollbar-gutter: stable;
         }
 
-        /* Animations from original file */
-        @keyframes pulse-attention {
-            0%, 100% { transform: scale(1); box-shadow: 0 4px 12px rgba(0, 191, 165, 0.2); }
-            50% { transform: scale(1.03); box-shadow: 0 0 0 4px rgba(0, 191, 165, 0.15); }
-        }
-        .animate-pulse-attention { 
-            animation: pulse-attention 2.5s infinite cubic-bezier(0.4, 0, 0.2, 1); 
+        /* BRUSHED ALUMINUM BACKGROUND - Jobs Era Homage */
+        .main-wrapper { 
+            width: 440px; 
+            min-width: 440px;
+            max-width: 440px;
+            min-height: 100vh;
+            background: #e5e7eb;
+            background-image: 
+                linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px),
+                linear-gradient(180deg, #f3f4f6 0%, #9ca3af 100%);
+            background-size: 2px 2px, 2px 2px, 100% 100%;
+            display: flex; 
+            flex-direction: column; 
+            box-shadow: 0 0 40px rgba(0,0,0,0.25);
+            position: relative;
+            box-sizing: border-box;
+            border-left: 1px solid #ffffff;
+            border-right: 1px solid #777;
         }
 
-        /* 3D Flip Effects */
-        .perspective-1000 { perspective: 1000px; }
-        .flip-card-inner { transition: transform 0.6s; transform-style: preserve-3d; position: relative; width: 100%; height: 100%; }
-        .is-flipped { transform: rotateY(180deg); }
-        .flip-card-front, .flip-card-back { 
-            backface-visibility: hidden; 
-            position: absolute; 
-            width: 100%; 
-            height: 100%; 
-            top: 0; 
-            left: 0; 
-            border-radius: 20px;
-            background-color: var(--color-bg-card);
-            box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+        /* Metallic Buttons - Aqua UI Homage */
+        .btn-metallic-blue {
+            background: linear-gradient(180deg, #4facfe 0%, #0061ff 100%);
+            box-shadow: 0 4px 15px rgba(0, 97, 255, 0.3), inset 0 1px 1px rgba(255,255,255,0.5);
+            border: 1px solid #0056e0;
+            color: white;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+            transition: all 0.2s;
         }
-        .flip-card-back { transform: rotateY(180deg); overflow-y: auto; }
+        .btn-metallic-blue:active { transform: scale(0.97); filter: brightness(0.9); }
 
-        /* Custom Scroll */
-        .custom-scroll::-webkit-scrollbar { width: 4px; }
-        .custom-scroll::-webkit-scrollbar-thumb { background-color: #E5E8EB; border-radius: 4px; }
-        
-        /* Input & Dropdown */
-        .search-dropdown {
-            max-height: 200px;
-            overflow-y: auto;
-            border: 1px solid #eee;
-            border-top: none;
-            background: white;
-            position: absolute;
+        .btn-metallic-red {
+            background: linear-gradient(180deg, #ff7675 0%, #d63031 100%);
+            box-shadow: 0 4px 15px rgba(214, 48, 49, 0.3), inset 0 1px 1px rgba(255,255,255,0.5);
+            border: 1px solid #b71c1c;
+            color: white;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+            transition: all 0.2s;
+        }
+        .btn-metallic-red:active { transform: scale(0.97); filter: brightness(0.9); }
+
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 16px;
+            border: 1px solid rgba(255,255,255,0.8);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        }
+
+        .input-group {
+            background: #ffffff;
+            border-radius: 12px;
+            padding: 10px 14px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
             width: 100%;
-            z-index: 50;
-            border-radius: 0 0 12px 12px;
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            box-sizing: border-box;
+            height: 52px;
+            border: 1px solid #cbd5e1;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.04);
         }
+
+        .tag-side {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 800;
+            background-color: #f1f5f9;
+            color: #64748B;
+            border: 1px solid #E2E8F0;
+            margin-left: 8px;
+            white-space: nowrap;
+        }
+
+        .tag-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 700;
+            background-color: #ffffff;
+            color: #475569;
+            border: 1px solid #cbd5e1;
+            margin: 0 2px;
+        }
+        .tag-badge-dark { background-color: #334155; color: #FFFFFF; border: none; }
+
+        .detail-drawer {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.6s cubic-bezier(0.25, 1, 0.5, 1);
+            background-color: #ffffff;
+            position: relative;
+        }
+        .detail-drawer::before {
+            content: '';
+            position: absolute;
+            top: -6px; left: 0; right: 0;
+            height: 12px;
+            background: radial-gradient(circle, transparent 0.25em, #ffffff 0.3em);
+            background-size: 1em 1em;
+            background-position: 0.5em 0;
+            transform: rotate(180deg);
+        }
+        .detail-drawer.open { max-height: 2000px; }
+
+        input.ship-fare-input { 
+            text-align: right; background-color: transparent; width: 100px; 
+            font-family: var(--font-suit); font-weight: 700; outline: none; 
+            border-bottom: 2px solid #E2E8F0; padding: 0 2px; color: #191F28; 
+            font-size: 18px;
+        }
+
+        .deduct-btn {
+            position: absolute;
+            left: 50%; top: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 11px; 
+            padding: 4px 12px; 
+            border-radius: 8px; 
+            font-weight: 700;
+            border: 1px solid #cbd5e1; 
+            background: #f8fafc; 
+            color: #64748B; 
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+            cursor: pointer;
+            z-index: 10;
+        }
+        .deduct-btn.active { background: #ffffff; color: #EF4444; border-color: #EF4444; }
+
+        .suggestions-box {
+            position: absolute; left: 0; right: 0; top: 100%;
+            background: white; border: 1px solid #E5E7EB;
+            border-radius: 0 0 12px 12px; z-index: 999;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2);
+            max-height: 240px; overflow-y: auto;
+        }
+        .suggestion-item {
+            padding: 12px 16px; cursor: pointer;
+            display: flex; justify-content: space-between; align-items: center;
+            font-size: 15px; color: #374151; font-weight: 500;
+        }
+        .suggestion-item:hover { background-color: #F0FDFA; }
+
+        @keyframes wiggle { 0%, 100% { transform: rotate(-10deg); } 50% { transform: rotate(10deg); } }
+        .icon-wiggle { display: inline-block; animation: wiggle 1.5s ease-in-out infinite; transform-origin: bottom center; margin-left: 4px; }
     </style>
 </head>
 <body>
@@ -84,297 +212,474 @@
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
 
-        // 1. 2026 전남 교육행정 여비 규정 상수
-        const CONFIG = {
-            OUT_DAILY: 25000,   // 관외 일비 (2026 인상)
-            OUT_MEAL: 25000,    // 관외 식비 (1식 8,330원)
-            IN_DAILY_LONG: 20000, // 관내 4시간 이상
-            IN_DAILY_SHORT: 10000,// 관내 4시간 미만
-            BUS_RATE: 168.6,    // 시외버스 표준 요율
-            BASE_FARE: 1800     // 기본 요금
-        };
-
-        // 2. 도서 지역 승선료 DB (반값 할인 적용 실비)
-        const FERRY_DB = { 
-            "흑산": 20550, "하의": 5930, "신의": 5930, "비금": 10500, 
-            "도초": 10500, "청산": 3850, "노화": 3850, "조도": 5000, "완도": 0, "진도": 0 
-        };
-
-        // 아이콘 컴포넌트 (기존 스타일 유지)
         const Icons = {
-            Search: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>,
-            Refresh: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/></svg>,
-            ArrowRight: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>,
-            MapPin: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+            MapPin: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>,
+            Search: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" {...props}><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>,
+            ChevronDown: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="m6 9 6 6 6-6"/></svg>,
+            X: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>,
+            Info: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" {...props}><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="16" y2="12"/><line x1="12" x2="12.01" y1="8" y2="8"/></svg>
         };
 
-        // 자동완성 입력 컴포넌트
-        const AutocompleteInput = ({ label, value, onChange, onSelect, list }) => {
+        const CHOSUNG = ["ㄱ","ㄲ","ㄴ","ㄷ","ㄸ","ㄹ","ㅁ","ㅂ","ㅃ","ㅅ","ㅆ","ㅇ","ㅈ","ㅉ","ㅊ","ㅋ","ㅌ","ㅍ","ㅎ"];
+        const COMPLEX_JAMO_MAP = {'ㄳ':'ㄱㅅ','ㄵ':'ㄴㅈ','ㄶ':'ㄴㅎ','ㄺ':'ㄹㄱ','ㄻ':'ㄹㅁ','ㄼ':'ㄹㅂ','ㄽ':'ㄹㅅ','ㄾ':'ㄹㅌ','ㄿ':'ㄹㅍ','ㅀ':'ㄹㅎ','ㅄ':'ㅂㅅ'};
+
+        const getChosung = (str) => {
+            if (!str) return "";
+            let result = "";
+            for (let i = 0; i < str.length; i++) {
+                const code = str.charCodeAt(i) - 44032;
+                if (code > -1 && code < 11172) result += CHOSUNG[Math.floor(code / 588)];
+                else result += str.charAt(i);
+            }
+            return result;
+        };
+        const resolveComplexJamo = (str) => !str ? "" : str.split('').map(char => COMPLEX_JAMO_MAP[char] || char).join('');
+        const normalize = (text) => {
+            if (!text) return "";
+            if (text.includes("군외")) return "군외"; 
+            return text.replace(/(시|군|읍|면|터미널|종합|공용|\s)/g, "");
+        };
+        const fmt = (num) => (num !== undefined && num !== null) ? num.toLocaleString() : '0';
+
+        const ALLOWED_CITIES = [
+            "광주", "남악", "목포", "여수", "순천", "나주", "광양", "담양", "곡성", "구례", "고흥", "보성",
+            "화순", "장흥", "강진", "해남", "영암", "무안", "함평", "영광", "장성", "완도", "진도", "신안", "신안교육청",
+            "압해", "지도", "증도", "임자", "팔금", "암태", "자은", "안좌", "장산", "하의", "신의", 
+            "흑산", "비금", "도초", "청산", "노화", "소안", "여서도", "금일", 
+            "생일", "보길", "금당", "군외", "신지", "고금", "약산", 
+            "홍도", "가거도", "만재도", "진도조도", "진도관매도", "진도서거차도",
+            "고흥득량도", "고흥쑥섬(애도)", "영광안마도", "영광낙월", "영광송이도", "해남어룡도"
+        ];
+
+        const REGION_ICONS = {
+            "광주": "🍉", "목포": "⚓", "여수": "🎤", "순천": "🌾", "나주": "🍐", "광양": "⚽", "담양": "🎋", "곡성": "🚂", "구례": "🐻", "고흥": "🚀", "보성": "🍵", "화순": "🪨", "장흥": "🍄", "강진": "🏺", "해남": "🦖", "영암": "🏎️", "무안": "🧅", "함평": "🦋", "영광": "🐟", "장성": "🍂", "완도": "🦪", "진도": "🐕", "신안": "🪽", "신안교육청": "🏛️", "남악": "🏛️", 
+            "지도": "🧂", "압해": "🐙", "증도": "🚲", "임자": "🌷", "자은": "🏖️", "안좌": "😈", "팔금": "🦐", "암태": "🌁", "비금": "🦅", "도초": "🌿", "흑산": "🐟", "하의": "🕊️", "신의": "🧂", "장산": "🏔️",
+            "청산": "🐌", "노화": "🦪", "소안": "🇰🇷", "여서도": "🎣", "금일": "🌊", "생일": "🎂", "보길": "📜", "금당": "🗿", "군외": "🌉", "신지": "🏖️", "고금": "🚢", "약산": "🐐",
+            "홍도": "🌅", "가거도": "🏝️", "만재도": "🎣", "진도조도": "🦅", "진도서거차도": "🚢", "진도관매도": "🌲",
+            "고흥득량도": "🌾", "고흥쑥섬(애도)": "🐱", "영광안마도": "🐎", "영광낙월": "🌙", "영광송이도": "🐚", "해남어룡도": "🐉"
+        };
+
+        const ISLAND_DB = {
+            "신안": { hub: "목포", cost: 0, type: "connected" },
+            "신안교육청": { hub: "목포", cost: 0, type: "connected" },
+            "압해": { hub: "목포", cost: 2000, type: "connected" },
+            "지도": { hub: "목포", cost: 2000, type: "connected" },
+            "증도": { hub: "목포", cost: 2000, type: "connected" },
+            "임자": { hub: "목포", cost: 2000, type: "connected" },
+            "팔금": { hub: "목포", cost: 2000, type: "connected" },
+            "암태": { hub: "목포", cost: 2000, type: "connected" },
+            "자은": { hub: "목포", cost: 2000, type: "connected" },
+            "안좌": { hub: "목포", cost: 2000, type: "connected" },
+            "비금": { hub: "목포", via: "목포, 암태", cost: 2000, shipCost: 1000, type: "ship", special: true },
+            "도초": { hub: "목포", via: "목포, 암태", cost: 0, shipCost: 1000, type: "ship", special: true },
+            "장산": { hub: "목포", cost: 0, shipCost: 1000, type: "ship" },
+            "하의": { hub: "목포", cost: 0, shipCost: 1000, type: "ship" },
+            "신의": { hub: "목포", cost: 0, shipCost: 1000, type: "ship" },
+            "흑산": { hub: "목포", cost: 0, shipCost: 1000, type: "ship" },
+            "홍도": { hub: "목포", cost: 0, shipCost: 1000, type: "ship" },
+            "가거도": { hub: "목포", cost: 0, shipCost: 1000, type: "ship" },
+            "만재도": { hub: "목포", cost: 0, shipCost: 1000, type: "ship" },
+            "완도": { hub: "완도", cost: 0, type: "connected", special: true }, 
+            "군외": { hub: "완도", cost: 0, type: "connected", special: true }, 
+            "신지": { hub: "완도", cost: 0, type: "connected", special: true },
+            "고금": { hub: "완도", cost: 0, type: "connected", special: true },
+            "약산": { hub: "완도", cost: 0, type: "connected", special: true },
+            "청산": { hub: "완도", cost: 0, shipCost: 1000, type: "ship" },
+            "노화": { hub: "완도", cost: 0, shipCost: 1000, type: "ship" },
+            "보길": { hub: "완도", cost: 0, shipCost: 1000, type: "ship" },
+            "소안": { hub: "완도", cost: 0, shipCost: 1000, type: "ship" },
+            "여서도": { hub: "완도", cost: 0, shipCost: 1000, type: "ship" },
+            "금일": { hub: "완도", cost: 0, shipCost: 1000, type: "ship" },
+            "생일": { hub: "완도", cost: 0, shipCost: 1000, type: "ship" },
+            "진도조도": { hub: "진도", cost: 1000, shipCost: 1000, type: "ship" },
+            "진도관매도": { hub: "진도", cost: 1000, shipCost: 1000, type: "ship" },
+            "진도서거차도": { hub: "진도", cost: 1000, shipCost: 1000, type: "ship" },
+            "고흥득량도": { hub: "고흥", cost: 1000, shipCost: 1000, type: "ship" },
+            "고흥쑥섬(애도)": { hub: "고흥", cost: 1000, shipCost: 1000, type: "ship" },
+            "영광안마도": { hub: "영광", cost: 1000, type: "ship" },
+            "영광낙월": { hub: "영광", cost: 1000, type: "ship" },
+            "영광송이도": { hub: "영광", cost: 1000, type: "ship" },
+            "금당": { hub: "장흥", cost: 0, shipCost: 1000, type: "ship" },
+            "해남어룡도": { hub: "해남", cost: 1000, type: "ship" }
+        };
+
+        const SAME_AREA_GROUPS = [
+            new Set(["목포", "신안", "신안교육청"]), new Set(["노화", "보길"]), new Set(["비금", "도초"]),
+            new Set(["압해", "자은", "팔금", "암태", "안좌", "임자", "지도", "증도"]),
+            new Set(["군외", "완도", "고금", "약산", "신지", "금당"])
+        ];
+
+        const POPUP_REGIONS = {
+            "신안": ["신안교육청", "지도", "압해", "증도", "임자", "자은", "안좌", "팔금", "암태", "비금", "도초", "흑산", "하의", "신의", "장산", "홍도", "가거도", "만재도"],
+            "완도": ["완도", "금일", "노화", "군외", "신지", "고금", "약산", "청산", "소안", "금당", "보길", "생일", "여서도"]
+        };
+
+        const AutocompleteInput = ({ value, onChange, onSelect, placeholder, cityList, onEnter }) => {
             const [suggestions, setSuggestions] = useState([]);
             const [showSuggestions, setShowSuggestions] = useState(false);
+            const [activeIndex, setActiveIndex] = useState(-1);
 
             useEffect(() => {
-                if (!value) { setSuggestions([]); return; }
-                if (list.includes(value)) { setSuggestions([]); return; } // 완벽 일치 시 숨김
-                
-                const filtered = list.filter(item => item.includes(value)).slice(0, 10); // 최대 10개
-                setSuggestions(filtered);
-            }, [value, list]);
+                const inputVal = (value || '').trim();
+                if (!inputVal || cityList.includes(inputVal)) { setSuggestions([]); return; }
+                const resolved = resolveComplexJamo(inputVal);
+                const isChosung = /^[ㄱ-ㅎ]+$/.test(resolved); 
+                let exact = cityList.filter(city => {
+                    if (isChosung) return getChosung(city).includes(resolved);
+                    return city.includes(inputVal);
+                });
+                setSuggestions(exact.length > 0 ? exact : []);
+            }, [value, cityList]);
+
+            const handleSelect = (city) => { onSelect(city); setShowSuggestions(false); setSuggestions([]); };
+            const handleInputClick = () => { if (value) { onChange(''); onSelect(''); } };
+
+            const handleKeyDown = (e) => {
+                if (e.key === 'ArrowDown') { e.preventDefault(); if (suggestions.length > 0) setActiveIndex(prev => (prev < suggestions.length - 1 ? prev + 1 : 0)); }
+                else if (e.key === 'ArrowUp') { e.preventDefault(); if (suggestions.length > 0) setActiveIndex(prev => (prev > 0 ? prev - 1 : suggestions.length - 1)); }
+                else if (e.key === 'Enter') {
+                    if (e.nativeEvent.isComposing) return;
+                    if (activeIndex >= 0 && suggestions.length > 0) handleSelect(suggestions[activeIndex]);
+                    else if (suggestions.length > 0) handleSelect(suggestions[0]);
+                    else if (onEnter) onEnter(); 
+                    e.target.blur();
+                }
+            };
 
             return (
-                <div className="relative group">
-                    <div className="bg-white rounded-2xl p-4 flex items-center gap-3 border border-transparent focus-within:border-[#00BFA5] shadow-sm transition-all">
-                        <Icons.MapPin />
-                        <div className="flex-1">
-                            <label className="block text-[10px] font-bold text-gray-400 mb-1">{label}</label>
-                            <input 
-                                type="text" 
-                                className="w-full bg-transparent outline-none font-suit font-bold text-lg text-gray-800 placeholder-gray-300"
-                                placeholder={`${label} 입력 (예: 함평)`}
-                                value={value}
-                                onChange={(e) => { onChange(e.target.value); setShowSuggestions(true); }}
-                                onFocus={() => setShowSuggestions(true)}
-                                onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-                            />
-                        </div>
+                <div className="relative w-full">
+                    <div className="input-group">
+                        <Icons.MapPin className="text-gray-400 shrink-0" size={18} />
+                        <input type="text" className="flex-1 bg-transparent outline-none font-suit font-bold text-gray-800 text-lg placeholder-gray-300" placeholder={placeholder} value={value || ''} onChange={e => { onChange(e.target.value); setShowSuggestions(true); }} onClick={handleInputClick} onFocus={() => setShowSuggestions(true)} onBlur={() => setTimeout(() => setShowSuggestions(false), 200)} onKeyDown={handleKeyDown} autoComplete="off" />
+                        {value && REGION_ICONS[value.replace(/\s/g, "")] && <span className="text-xl icon-wiggle">{REGION_ICONS[value.replace(/\s/g, "")]}</span>}
                     </div>
                     {showSuggestions && suggestions.length > 0 && (
-                        <ul className="search-dropdown custom-scroll">
-                            {suggestions.map((item, idx) => (
-                                <li key={idx} onClick={() => onSelect(item)} className="p-3 hover:bg-teal-50 cursor-pointer text-sm font-medium text-gray-700">
-                                    {item}
-                                </li>
+                        <div className="suggestions-box custom-scroll">
+                            {suggestions.map((city, idx) => (
+                                <div key={city} onMouseDown={(e) => { e.preventDefault(); handleSelect(city); }} onMouseEnter={() => setActiveIndex(idx)} className={`suggestion-item ${idx === activeIndex ? 'bg-teal-50' : ''}`}><span>{city}</span><span>{REGION_ICONS[city.replace(/\s/g, "")]}</span></div>
                             ))}
-                        </ul>
+                        </div>
                     )}
                 </div>
             );
         };
 
         const App = () => {
-            // Data States
-            const [distanceDB, setDistanceDB] = useState([]);
-            const [institutions, setInstitutions] = useState([]);
-            const [isLoading, setIsLoading] = useState(true);
-
-            // User Input States
             const [origin, setOrigin] = useState('');
             const [destination, setDestination] = useState('');
-            const [distance, setDistance] = useState(0);
+            const [result, setResult] = useState(null);
+            const [busDataState, setBusDataState] = useState({});
+            const [modalState, setModalState] = useState({ type: null, data: [] });
+            const [showDetail, setShowDetail] = useState(false);
+            const [shipFare, setShipFare] = useState(0); 
+            const [customTransport, setCustomTransport] = useState('');
+            const [manualMainTransport, setManualMainTransport] = useState(null); 
             
-            // UI States
-            const [isFlipped, setIsFlipped] = useState(false);
-            const [deductions, setDeductions] = useState({
-                gov_vehicle: false,
-                meal_count: 0
-            });
+            const [intraCityOpen, setIntraCityOpen] = useState(false);
+            const [intraDeductions, setIntraDeductions] = useState({ shortTime: false, govVehicle: false });
+            
+            const [activeModal, setActiveModal] = useState(null); 
+            const [deductions, setDeductions] = useState({ gov_vehicle: false, meal_1: false, meal_2: false, meal_3: false, meal_half: false, transport_proof: false, transport_gov_vehicle: false, transport_passenger: false });
 
-            // 1. CSV 데이터 로드 (내구성 핵심)
             useEffect(() => {
-                Papa.parse("Korea_Education_Distance_Matrix_Full_2026.csv", {
-                    download: true,
-                    header: true,
-                    skipEmptyLines: true,
-                    complete: (results) => {
-                        const data = results.data;
-                        setDistanceDB(data);
-                        // 기관명 중복 제거 및 정렬
-                        const uniqueOffices = [...new Set([...data.map(i => i.출발기관), ...data.map(i => i.도착기관)])].sort();
-                        setInstitutions(uniqueOffices);
-                        setIsLoading(false);
-                    },
-                    error: (err) => {
-                        console.error("CSV Load Error:", err);
-                        setIsLoading(false); // 실패해도 앱은 켜지도록
-                    }
+                const INITIAL_DATA = {
+                    "광주": { "목포": { gen: 7200, pre: 9300 }, "여수": { gen: 13000, pre: 16800 }, "순천": { gen: 8400, pre: 11000 }, "나주": { gen: 4300 }, "광양": { gen: 8400, pre: 10900 }, "담양": { gen: 2900 }, "곡성": { gen: 5500 }, "구례": { gen: 9800 }, "고흥": { gen: 16200, pre: 21000 }, "보성": { gen: 10500, pre: 11500 }, "화순": { gen: 2500 }, "장흥": { gen: 11500, pre: 14900 }, "강진": { gen: 11700, pre: 15200 }, "해남": { gen: 13700, pre: 16900 }, "영암": { gen: 8700 }, "무안": { gen: 6000, pre: 7800 }, "함평": { gen: 4500, pre: 5800 }, "영광": { gen: 7300, pre: 9500 }, "장성": { gen: 2400 }, "완도": { gen: 20500, pre: 24800 }, "진도": { gen: 15300, pre: 19900 }, "남악": { gen: 7200, pre: 9300 } },
+                    "목포": { "광주": { gen: 7200, pre: 9300 }, "여수": { gen: 16500, pre: 21400 }, "순천": { gen: 11500, pre: 15000 }, "나주": { gen: 7300 }, "광양": { gen: 13700, pre: 17800 }, "담양": { gen: 10100 }, "곡성": { gen: 12700 }, "구례": { gen: 17000 }, "고흥": { gen: 18600 }, "보성": { gen: 13500 }, "화순": { gen: 9700 }, "장흥": { gen: 10200 }, "강진": { gen: 7800 }, "해남": { gen: 8700 }, "영암": { gen: 6400 }, "무안": { gen: 3200 }, "함평": { gen: 5100 }, "영광": { gen: 8700 }, "장성": { gen: 9600 }, "완도": { gen: 15700 }, "진도": { gen: 8300, pre: 10800 }, "남악": { gen: 1700 } },
+                    "여수": { "광주": { gen: 13000, pre: 16800 }, "목포": { gen: 16500, pre: 21400 }, "순천": { gen: 5000 }, "나주": { gen: 17300 }, "광양": { gen: 7500 }, "담양": { gen: 15900 }, "곡성": { gen: 18500 }, "구례": { gen: 10200 }, "고흥": { gen: 13600 }, "보성": { gen: 12800 }, "화순": { gen: 15500 }, "장흥": { gen: 16100 }, "강진": { gen: 18500 }, "해남": { gen: 21500 }, "영암": { gen: 22400 }, "무안": { gen: 19000 }, "함평": { gen: 17500 }, "영광": { gen: 20300 }, "장성": { gen: 15400 }, "완도": { gen: 28200 }, "진도": { gen: 24800 }, "남악": { gen: 15600, pre: 20200 } },
+                    "순천": { "광주": { gen: 8400, pre: 11000 }, "목포": { gen: 11500, pre: 15000 }, "여수": { gen: 5000 }, "나주": { gen: 12700 }, "광양": { gen: 2500 }, "담양": { gen: 10100 }, "곡성": { gen: 9400 }, "구례": { gen: 5200 }, "고흥": { gen: 8700 }, "보성": { gen: 7900 }, "화순": { gen: 9700 }, "장흥": { gen: 11100 }, "강진": { gen: 13500 }, "해남": { gen: 16600 }, "영암": { gen: 17500 }, "무안": { gen: 14700, pre: 18200 }, "함평": { gen: 12900 }, "영광": { gen: 15700 }, "장성": { gen: 10800 }, "완도": { gen: 23200 }, "진도": { gen: 23900 }, "남악": { gen: 10600, pre: 13800 } },
+                    "나주": { "광주": { gen: 4300 }, "목포": { gen: 7300 }, "여수": { gen: 17300 }, "순천": { gen: 12700 }, "광양": { gen: 12700 }, "담양": { gen: 7200 }, "곡성": { gen: 9800 }, "구례": { gen: 14100 }, "고흥": { gen: 20500 }, "보성": { gen: 14800 }, "화순": { gen: 6800 }, "장흥": { gen: 9000 }, "강진": { gen: 8200 }, "해남": { gen: 9900 }, "영암": { gen: 4400 }, "무안": { gen: 4100 }, "함평": { gen: 3700 }, "영광": { gen: 7400 }, "장성": { gen: 6700 }, "완도": { gen: 16600 }, "진도": { gen: 17200 }, "남악": { gen: 9000 } },
+                    "광양": { "광주": { gen: 8400, pre: 10900 }, "목포": { gen: 13700, pre: 17800 }, "여수": { gen: 7500 }, "순천": { gen: 2500 }, "나주": { gen: 12700 }, "담양": { gen: 11300 }, "곡성": { gen: 13900 }, "구례": { gen: 7700 }, "고흥": { gen: 10200 }, "보성": { gen: 9900 }, "화순": { gen: 10900 }, "장흥": { gen: 13200 }, "강진": { gen: 15600 }, "해남": { gen: 19100 }, "영암": { gen: 19500 }, "무안": { gen: 14400 }, "함평": { gen: 12900 }, "영광": { gen: 15700 }, "장성": { gen: 10800 }, "완도": { gen: 25800 }, "진도": { gen: 23400 }, "남악": { gen: 11700 } },
+                    "담양": { "광주": { gen: 2900 }, "목포": { gen: 10100 }, "여수": { gen: 15900 }, "순천": { gen: 10100 }, "나주": { gen: 11300 }, "광양": { gen: 11300 }, "곡성": { gen: 8400 }, "구례": { gen: 12700 }, "고흥": { gen: 19100 }, "보성": { gen: 13400 }, "화순": { gen: 8000 }, "장흥": { gen: 14400 }, "강진": { gen: 14600 }, "해남": { gen: 16600 }, "영암": { gen: 11600 }, "무안": { gen: 8900 }, "함평": { gen: 7400 }, "영광": { gen: 10200 }, "장성": { gen: 5300 }, "완도": { gen: 23400 }, "진도": { gen: 18200 }, "남악": { gen: 10100 } },
+                    "곡성": { "광주": { gen: 5500 }, "목포": { gen: 12700 }, "여수": { gen: 18500 }, "순천": { gen: 9800 }, "나주": { gen: 9800 }, "광양": { gen: 13900 }, "담양": { gen: 8400 }, "구례": { gen: 4300 }, "고흥": { gen: 21400 }, "보성": { gen: 17300 }, "화순": { gen: 8000 }, "장흥": { gen: 17000 }, "강진": { gen: 2400 }, "해남": { gen: 19200 }, "영암": { gen: 14200 }, "무안": { gen: 11500 }, "함평": { gen: 8800 }, "영광": { gen: 12800 }, "장성": { gen: 7900 }, "완도": { gen: 23000 }, "진도": { gen: 20800 }, "남악": { gen: 12700 } },
+                    "구례": { "광주": { gen: 9800 }, "목포": { gen: 17000 }, "여수": { gen: 10200 }, "순천": { gen: 5200 }, "나주": { gen: 14100 }, "광양": { gen: 7700 }, "담양": { gen: 12700 }, "곡성": { gen: 4300 }, "고흥": { gen: 21400 }, "보성": { gen: 17300 }, "화순": { gen: 8000 }, "장흥": { gen: 17000 }, "강진": { gen: 2400 }, "해남": { gen: 19200 }, "영암": { gen: 14200 }, "무안": { gen: 11500 }, "함평": { gen: 8800 }, "영광": { gen: 12800 }, "장성": { gen: 28200 }, "완도": { gen: 28200 }, "진도": { gen: 24800 }, "남악": { gen: 15600, pre: 20200 } },
+                    "고흥": { "광주": { gen: 16200, pre: 21000 }, "목포": { gen: 18600 }, "여수": { gen: 13600 }, "순천": { gen: 8700 }, "나주": { gen: 20500 }, "광양": { gen: 10200 }, "담양": { gen: 19100 }, "곡성": { gen: 21400 }, "구례": { gen: 13900 }, "보성": { gen: 9900 }, "화순": { gen: 13700 }, "장흥": { gen: 13100 }, "강진": { gen: 14200 }, "해남": { gen: 18600 }, "영암": { gen: 19500 }, "무안": { gen: 22200 }, "함평": { gen: 20700 }, "영광": { gen: 23500 }, "장성": { gen: 18600 }, "완도": { gen: 25200 }, "진도": { gen: 25900 }, "남악": { gen: 23400 } },
+                    "보성": { "광주": { gen: 10500, pre: 11500 }, "목포": { gen: 13500 }, "여수": { gen: 12800 }, "순천": { gen: 7900 }, "나주": { gen: 14800 }, "광양": { gen: 9900 }, "담양": { gen: 13400 }, "곡성": { gen: 17300 }, "구례": { gen: 13100 }, "고흥": { gen: 9900 }, "화순": { gen: 7800 }, "장흥": { gen: 3200 }, "강진": { gen: 5700 }, "해남": { gen: 8700 }, "영암": { gen: 7800 }, "무안": { gen: 16700 }, "함평": { gen: 15000 }, "영광": { gen: 17800 }, "장성": { gen: 12900 }, "완도": { gen: 15400 }, "진도": { gen: 16000 }, "남악": { gen: 13500 } },
+                    "화순": { "광주": { gen: 2500 }, "목포": { gen: 9700 }, "여수": { gen: 15500 }, "순천": { gen: 9700 }, "나주": { gen: 6800 }, "광양": { gen: 10900 }, "담양": { gen: 8000 }, "곡성": { gen: 8000 }, "구례": { gen: 12300 }, "고흥": { gen: 13700 }, "보성": { gen: 7800 }, "장흥": { gen: 10000 }, "강진": { gen: 11400 }, "해남": { gen: 16500 }, "영암": { gen: 11200 }, "무안": { gen: 8500 }, "함평": { gen: 7000 }, "영광": { gen: 9800 }, "장성": { gen: 4900 }, "완도": { gen: 23000 }, "진도": { gen: 17800 }, "남악": { gen: 9700 } },
+                    "장흥": { "광주": { gen: 11500, pre: 14900 }, "목포": { gen: 10200 }, "여수": { gen: 16100 }, "순천": { gen: 11100 }, "나주": { gen: 9000 }, "광양": { gen: 13200 }, "담양": { gen: 14400 }, "곡성": { gen: 17000 }, "구례": { gen: 16300 }, "고흥": { gen: 13100 }, "보성": { gen: 3200 }, "화순": { gen: 10000 }, "강진": { gen: 2400 }, "해남": { gen: 5400 }, "영암": { gen: 4600 }, "무안": { gen: 8500 }, "함평": { gen: 7000 }, "영광": { gen: 9800 }, "장성": { gen: 4900 }, "완도": { gen: 2300 }, "진도": { gen: 12700 }, "남악": { gen: 9700 } },
+                    "강진": { "광주": { gen: 11700, pre: 15200 }, "목포": { gen: 7800 }, "여수": { gen: 18500 }, "순천": { gen: 13500 }, "나주": { gen: 8200 }, "광양": { gen: 12700 }, "담양": { gen: 14600 }, "곡성": { gen: 17200 }, "구례": { gen: 18700 }, "고흥": { gen: 14200 }, "보성": { gen: 5700 }, "화순": { gen: 11400 }, "장흥": { gen: 2400 }, "해남": { gen: 3000 }, "영암": { gen: 3900 }, "무안": { gen: 11000 }, "함평": { gen: 11600 }, "영광": { gen: 16500 }, "장성": { gen: 14100 }, "완도": { gen: 7300 }, "진도": { gen: 10300 }, "남악": { gen: 7600 } },
+                    "해남": { "광주": { gen: 13700, pre: 16900 }, "목포": { gen: 8700 }, "여수": { gen: 21500 }, "순천": { gen: 16600 }, "나주": { gen: 9900 }, "광양": { gen: 19100 }, "담양": { gen: 16600 }, "곡성": { gen: 19200 }, "구례": { gen: 21800 }, "고흥": { gen: 18600 }, "보성": { gen: 8700 }, "화순": { gen: 16500 }, "장흥": { gen: 5400 }, "강진": { gen: 3000 }, "영암": { gen: 4900 }, "무안": { gen: 8500 }, "함평": { gen: 7000 }, "영광": { gen: 9800 }, "장성": { gen: 4900 }, "완도": { gen: 6700, pre: 8200 }, "진도": { gen: 7300 }, "남악": { gen: 8500 } },
+                    "영암": { "광주": { gen: 8700 }, "목포": { gen: 6400 }, "여수": { gen: 22400 }, "순천": { gen: 17500 }, "나주": { gen: 4400 }, "광양": { gen: 19500 }, "담양": { gen: 11600 }, "곡성": { gen: 14200 }, "구례": { gen: 18500 }, "고흥": { gen: 19500 }, "보성": { gen: 7800 }, "화순": { gen: 11200 }, "장흥": { gen: 4600 }, "강진": { gen: 3900 }, "해남": { gen: 4900 }, "무안": { gen: 9600 }, "함평": { gen: 7700 }, "영광": { gen: 11800 }, "장성": { gen: 11100 }, "완도": { gen: 11600 }, "진도": { gen: 10300 }, "남악": { gen: 3700 } },
+                    "무안": { "광주": { gen: 6000, pre: 7800 }, "목포": { gen: 3200 }, "여수": { gen: 19000 }, "순천": { gen: 14700, pre: 18200 }, "나주": { gen: 4100 }, "광양": { gen: 14400 }, "담양": { gen: 8900 }, "곡성": { gen: 11500 }, "구례": { gen: 15800 }, "고흥": { gen: 22200 }, "보성": { gen: 16700 }, "화순": { gen: 8500 }, "장흥": { gen: 13400 }, "강진": { gen: 11000 }, "해남": { gen: 11900 }, "영암": { gen: 9600 }, "함평": { gen: 2500 }, "영광": { gen: 5500 }, "장성": { gen: 8400 }, "완도": { gen: 18900 }, "진도": { gen: 11500 }, "남악": { gen: 3700 } },
+                    "함평": { "광주": { gen: 4500, pre: 5800 }, "목포": { gen: 5100 }, "여수": { gen: 17500 }, "순천": { gen: 12900 }, "나주": { gen: 3700 }, "광양": { gen: 12900 }, "담양": { gen: 7400 }, "곡성": { gen: 8800 }, "구례": { gen: 14300 }, "고흥": { gen: 20700 }, "보성": { gen: 15000 }, "화순": { gen: 7000 }, "장흥": { gen: 15300 }, "강진": { gen: 11600 }, "해남": { gen: 13800 }, "영암": { gen: 7700 }, "무안": { gen: 2500 }, "영광": { gen: 3600 }, "장성": { gen: 6900 }, "완도": { gen: 20800 }, "진도": { gen: 13400 }, "남악": { gen: 6800 } },
+                    "영광": { "광주": { gen: 7300, pre: 9500 }, "목포": { gen: 8700 }, "여수": { gen: 20300 }, "순천": { gen: 15700 }, "나주": { gen: 7400 }, "광양": { gen: 15700 }, "담양": { gen: 10200 }, "곡성": { gen: 12800 }, "구례": { gen: 17100 }, "고흥": { gen: 23500 }, "보성": { gen: 17800 }, "화순": { gen: 9800 }, "장흥": { gen: 18900 }, "강진": { gen: 16500 }, "해남": { gen: 17400 }, "영암": { gen: 11800 }, "무안": { gen: 5500 }, "함평": { gen: 3600 }, "장성": { gen: 5900 }, "완도": { gen: 24400 }, "진도": { gen: 17000 }, "남악": { gen: 8700 } },
+                    "장성": { "광주": { gen: 2400 }, "목포": { gen: 9600 }, "여수": { gen: 10800 }, "순천": { gen: 6700 }, "나주": { gen: 10800 }, "광양": { gen: 5300 }, "담양": { gen: 7900 }, "곡성": { gen: 12200 }, "구례": { gen: 18600 }, "고흥": { gen: 12900 }, "보성": { gen: 4900 }, "화순": { gen: 13900 }, "장흥": { gen: 14100 }, "강진": { gen: 16100 }, "해남": { gen: 11100 }, "영암": { gen: 8400 }, "무안": { gen: 6900 }, "함평": { gen: 5900 }, "영광": { gen: 9700 }, "완도": { gen: 22900 }, "진도": { gen: 14000 }, "남악": { gen: 15500 } },
+                    "완도": { "광주": { gen: 20500, pre: 24800 }, "목포": { gen: 15700 }, "여수": { gen: 28200 }, "순천": { gen: 23200 }, "나주": { gen: 16600 }, "광양": { gen: 25800 }, "담양": { gen: 23400 }, "곡성": { gen: 23000 }, "구례": { gen: 28400 }, "고흥": { gen: 25200 }, "보성": { gen: 15400 }, "화순": { gen: 23000 }, "장흥": { gen: 12100 }, "강진": { gen: 7300 }, "해남": { gen: 6700, pre: 8200 }, "영암": { gen: 11600 }, "무안": { gen: 18900 }, "함평": { gen: 20800 }, "영광": { gen: 22900 }, "장성": { gen: 22900 }, "진도": { gen: 14000 }, "남악": { gen: 10100 } },
+                    "진도": { "광주": { gen: 15300, pre: 19900 }, "목포": { gen: 8300, pre: 10800 }, "여수": { gen: 24800 }, "순천": { gen: 23900 }, "나주": { gen: 17200 }, "광양": { gen: 23400 }, "담양": { gen: 18200 }, "곡성": { gen: 20800 }, "구례": { gen: 29100 }, "고흥": { gen: 25900 }, "보성": { gen: 16000 }, "화순": { gen: 17800 }, "장흥": { gen: 12700 }, "강진": { gen: 10300 }, "해남": { gen: 7300 }, "영암": { gen: 10300 }, "무안": { gen: 11500 }, "함평": { gen: 13400 }, "영광": { gen: 17000 }, "장성": { gen: 17700 }, "완도": { gen: 14000 }, "남악": { gen: 10100 } },
+                    "남악": { "광주": { gen: 7200, pre: 9300 }, "목포": { gen: 1700 }, "여수": { gen: 15600, pre: 20200 }, "순천": { gen: 10600, pre: 13800 }, "나주": { gen: 9000 }, "광양": { gen: 11700 }, "담양": { gen: 10100 }, "곡성": { gen: 12700 }, "구례": { gen: 19000 }, "고흥": { gen: 23400 }, "보성": { gen: 13500 }, "화순": { gen: 9700 }, "장흥": { gen: 10000 }, "강진": { gen: 7600 }, "해남": { gen: 8500 }, "영암": { gen: 3700 }, "무안": { gen: 3700 }, "함평": { gen: 6800 }, "영광": { gen: 8700 }, "장성": { gen: 9600 }, "완도": { gen: 15500 }, "진도": { gen: 10100 } } 
+                };
+
+                const expandedData = JSON.parse(JSON.stringify(INITIAL_DATA));
+                Object.keys(INITIAL_DATA).forEach(from => {
+                    Object.keys(INITIAL_DATA[from]).forEach(to => {
+                        if (!expandedData[to]) expandedData[to] = {};
+                        if (!expandedData[to][from]) expandedData[to][from] = INITIAL_DATA[from][to];
+                    });
                 });
+                setBusDataState(expandedData);
             }, []);
 
-            // 2. 거리 자동 조회 로직
-            useEffect(() => {
-                if (origin && destination && distanceDB.length > 0) {
-                    const match = distanceDB.find(item => 
-                        (item.출발기관 === origin && item.도착기관 === destination) ||
-                        (item.출발기관 === destination && item.도착기관 === origin)
-                    );
-                    if (match) {
-                        setDistance(parseFloat(match.편도거리_km));
+            const performCalculation = (o = origin, d = destination) => {
+                const from = normalize(o);
+                const to = normalize(d);
+                
+                setDeductions({ gov_vehicle: false, meal_1: false, meal_2: false, meal_3: false, meal_half: false, transport_proof: false, transport_gov_vehicle: false, transport_passenger: false });
+                setShipFare(0); setManualMainTransport(null);
+                
+                setShowDetail(true);
+
+                if ((o === '신안' || d === '신안') && !modalState.type) {
+                    setModalState({ type: o === '신안' ? 'origin' : 'destination', data: POPUP_REGIONS['신안'] });
+                    return;
+                }
+                if ((o === '완도' || d === '완도') && !modalState.type) {
+                    setModalState({ type: o === '완도' ? 'origin' : 'destination', data: POPUP_REGIONS['완도'] });
+                    return;
+                }
+
+                if (!from || !to) return;
+                
+                for (const group of SAME_AREA_GROUPS) {
+                    if (group.has(from) && group.has(to)) {
+                        setIntraCityOpen(true);
+                        return;
                     }
                 }
-            }, [origin, destination, distanceDB]);
 
-            // 3. 비용 계산 로직 (여비/편도교통비)
-            const calculateCosts = () => {
-                const isInterCity = distance > 12; // 12km 기준 관내/관외 판정
+                if (Object.keys(busDataState).length === 0) return;
+
+                const fromIsland = ISLAND_DB[from];
+                const toIsland = ISLAND_DB[to];
+                let searchFrom = from; let searchTo = to; let surcharge = 0; let shipSurcharge = 0; let viaPoint = null; let islandConfig = null; let isShipOnlyRoute = false;
+
+                if (fromIsland) { searchFrom = fromIsland.hub; surcharge += fromIsland.cost; shipSurcharge += (fromIsland.shipCost || 0); islandConfig = fromIsland; viaPoint = fromIsland.via || fromIsland.hub; }
+                if (toIsland) { searchTo = toIsland.hub; surcharge += toIsland.cost; shipSurcharge += (toIsland.shipCost || 0); islandConfig = toIsland; viaPoint = toIsland.via || toIsland.hub; }
                 
-                // 일비 (관용차 50% 감액)
-                let daily = isInterCity ? CONFIG.OUT_DAILY : CONFIG.IN_DAILY_LONG; 
-                if (!isInterCity && distance <= 0) daily = CONFIG.IN_DAILY_LONG; // 기본값
-                if (deductions.gov_vehicle) daily = isInterCity ? daily / 2 : daily - 10000;
+                const baseData = busDataState[searchFrom]?.[searchTo];
+                if (baseData || (searchFrom === searchTo)) {
+                    const finalGen = (baseData?.gen || 0) + surcharge;
+                    const finalPre = baseData?.pre ? baseData.pre + surcharge : null;
+                    const finalCost = finalPre ? finalPre : finalGen;
 
-                // 식비 (제공 식수 차감)
-                let meal = isInterCity ? CONFIG.OUT_MEAL - (deductions.meal_count * Math.floor(CONFIG.OUT_MEAL / 3)) : 0;
-
-                // 교통비 (편도) - 거리비례제
-                let oneWayTransport = Math.round((CONFIG.BASE_FARE + (distance > 10 ? (distance - 10) * CONFIG.BUS_RATE : 0)) / 100) * 100;
-                
-                // 승선료 자동 합산
-                let ferryFare = 0;
-                Object.keys(FERRY_DB).forEach(island => {
-                    if (destination.includes(island)) ferryFare = FERRY_DB[island];
-                });
-
-                // 총액 (왕복 교통비 + 왕복 승선료 + 일비 + 식비)
-                const totalTransport = (oneWayTransport * 2) + (ferryFare * 2);
-                const total = daily + meal + totalTransport;
-
-                return { daily, meal, oneWayTransport, ferryFare, totalTransport, total };
+                    setShipFare(shipSurcharge * 2);
+                    setManualMainTransport(finalCost * 2);
+                    if (islandConfig && islandConfig.type === 'ship') isShipOnlyRoute = true;
+                    setResult({ type: 'internal', cost: finalCost, routeType: (islandConfig && searchFrom !== searchTo) ? 'transfer' : 'direct', viaPoint, surcharge, shipCost: shipSurcharge, isShipOnlyRoute });
+                } else { setResult({ type: 'external' }); }
             };
 
-            const costs = calculateCosts();
+            const calculateDetailedCost = () => {
+                if (!result) return { total: 0 };
+                let daily = deductions.gov_vehicle ? 12500 : 25000;
+                let meal = deductions.meal_3 ? 0 : deductions.meal_1 ? 16660 : deductions.meal_2 ? 8330 : deductions.meal_half ? 12500 : 25000;
+                let transport = 0;
+                const isTransportDeducted = deductions.transport_proof || deductions.transport_gov_vehicle || deductions.transport_passenger;
+                if (!isTransportDeducted) {
+                    transport = result.type === 'internal' ? Number(manualMainTransport) : (Number(customTransport) || 0);
+                }
+                return { daily, meal, transport, total: daily + meal + transport + (shipFare || 0) };
+            };
+
+            const getRouteTags = () => {
+                const tags = [];
+                if (!result || result.type !== 'internal') return tags;
+                tags.push({ label: `${origin}→${destination}`, type: 'dark' });
+                if (result.routeType === 'transfer') tags.push({ label: `${result.viaPoint} 경유`, type: 'light' });
+                const normOrigin = normalize(origin); const normDest = normalize(destination);
+                const fromConfig = ISLAND_DB[normOrigin]; const toConfig = ISLAND_DB[normDest];
+                const isWandoConnected = (c) => c && c.hub === '완도' && c.type === 'connected';
+                const showBus = (fromConfig?.type === 'connected' && !isWandoConnected(fromConfig)) || (toConfig?.type === 'connected' && !isWandoConnected(toConfig)) || (result.surcharge > 0 && !isWandoConnected(fromConfig) && !isWandoConnected(toConfig));
+                const showShip = fromConfig?.type === 'ship' || toConfig?.type === 'ship';
+                if (showBus) tags.push({ label: '농어촌버스', type: 'light' });
+                if (showShip) tags.push({ label: '여객선', type: 'light' });
+                tags.push({ label: '당일', type: 'light' });
+                return tags;
+            };
+
+            const detailCosts = calculateDetailedCost();
+            const isTransportDeductedVar = deductions.transport_proof || deductions.transport_gov_vehicle || deductions.transport_passenger;
+            const routeTags = getRouteTags();
 
             return (
-                <div className="max-w-[480px] mx-auto min-h-screen flex flex-col p-6 bg-white">
-                    <header className="text-center mb-8 mt-4">
-                        <h1 className="text-2xl font-bold font-suit text-gray-900 tracking-tight">yeobi_easy for KOR</h1>
-                        <div className="flex items-center justify-center gap-2 mt-2">
-                            <span className={`w-2 h-2 rounded-full ${isLoading ? 'bg-orange-400 animate-pulse' : 'bg-[#00BFA5]'}`}></span>
-                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                                {isLoading ? 'DB Loading...' : '2026 Audit Ready'}
-                            </span>
-                        </div>
+                <div className="main-wrapper font-pretendard">
+                    <header className="h-[60px] flex items-center justify-between px-5 border-b border-gray-400 bg-transparent sticky top-0 z-40">
+                        <h1 className="font-suit font-bold text-lg text-teal-700">yeobi-easier <span className="text-xs font-medium text-gray-500 font-pretendard">JHN</span></h1>
+                        <button onClick={() => setIntraCityOpen(true)} className="btn-metallic-red w-20 h-10 rounded-lg flex flex-col items-center justify-center active:scale-95 transition-all shadow-lg">
+                            <Icons.Info size={14} className="mb-0.5" />
+                            <span className="text-[10px] font-bold leading-none">관내출장(참고)</span>
+                        </button>
                     </header>
 
-                    {/* 입력 섹션 */}
-                    <div className="space-y-4 mb-8 relative z-20">
-                        <AutocompleteInput 
-                            label="출발 기관" 
-                            value={origin} 
-                            onChange={setOrigin} 
-                            onSelect={setOrigin} 
-                            list={institutions} 
-                        />
-                        <div className="flex justify-center -my-2 relative z-10">
-                            <div className="bg-white p-1 rounded-full border border-gray-100 shadow-sm">
-                                <Icons.ArrowRight />
+                    <main className="flex-1 p-5 pt-8">
+                        <div className="space-y-5 mb-8">
+                            <AutocompleteInput 
+                                placeholder="출발지 (예: 광주)" 
+                                value={origin} 
+                                onChange={setOrigin} 
+                                cityList={ALLOWED_CITIES} 
+                                onSelect={(city) => { setOrigin(city); if(POPUP_REGIONS[city.replace(/\s/g, "")] ) setModalState({ type: 'origin', data: POPUP_REGIONS[city.replace(/\s/g, "")] }); else if (destination) performCalculation(city, destination); }} 
+                            />
+                            <AutocompleteInput 
+                                placeholder="도착지 (예: 비금)" 
+                                value={destination} 
+                                onChange={setDestination} 
+                                cityList={ALLOWED_CITIES} 
+                                onSelect={(city) => { setDestination(city); if(POPUP_REGIONS[city.replace(/\s/g, "")] ) setModalState({ type: 'destination', data: POPUP_REGIONS[city.replace(/\s/g, "")] }); else if (origin) performCalculation(origin, city); }} 
+                                onEnter={() => performCalculation()} 
+                            />
+                            <button onClick={() => performCalculation()} className="btn-metallic-blue w-full h-14 rounded-xl font-bold text-lg flex items-center justify-center gap-2 shadow-lg">
+                                <Icons.Search size={22} />
+                                조회하기
+                            </button>
+                        </div>
+                        
+                        <div className="min-h-[220px]">
+                            {result && (
+                                <div className="glass-panel p-5 animate-slide-up">
+                                    <div className="pb-3 flex flex-wrap justify-center gap-1 mb-5 border-b border-gray-100">
+                                        {routeTags.map((tag, idx) => (
+                                            <span key={idx} className={`tag-badge ${tag.type === 'dark' ? 'tag-badge-dark' : ''}`}>{tag.label}</span>
+                                        ))}
+                                    </div>
+                                    <div className="py-2 px-4">
+                                        {result.type === 'internal' ? (
+                                            <div className="flex justify-between items-center py-2 h-10">
+                                                <div className="flex items-center">
+                                                    <span className="text-[22px] font-bold text-teal-700">교통비</span>
+                                                    <span className="tag-side">편도</span>
+                                                </div>
+                                                <span className="text-[22px] font-suit font-bold text-teal-700">{fmt(result.cost)}원</span>
+                                            </div>
+                                        ) : <div className="text-lg font-bold text-gray-400 mb-2 text-center py-2">외부 검색 필요</div>}
+                                        <button onClick={() => setShowDetail(!showDetail)} className="w-full mt-5 py-3 bg-white/50 text-gray-600 text-sm font-bold rounded-xl border border-gray-300 hover:bg-white flex items-center justify-center gap-2 shadow-sm transition-all"><span>여비계산</span><Icons.ChevronDown className={`transition-transform duration-300 ${showDetail ? 'rotate-180' : ''}`} size={16} /></button>
+                                    </div>
+                                    <div className={`detail-drawer ${showDetail ? 'open' : ''}`}>
+                                        <div className="p-4 pt-10 space-y-6">
+                                            <div className="relative flex items-center justify-between h-10"><span className="text-[18px] font-bold text-gray-700 w-24">일비</span><button onClick={() => setActiveModal('daily')} className={`deduct-btn ${deductions.gov_vehicle ? 'active' : ''} animate-pulse-spread`}>감액</button><span className="text-[18px] font-suit font-bold text-gray-900 text-right flex-1">{fmt(detailCosts.daily)}원</span></div>
+                                            <div className="relative flex items-center justify-between h-10"><span className="text-[18px] font-bold text-gray-700 w-24">식비</span><button onClick={() => setActiveModal('meal')} className={`deduct-btn ${(deductions.meal_1 || deductions.meal_2 || deductions.meal_3 || deductions.meal_half) ? 'active' : ''} animate-pulse-spread`}>감액</button><span className="text-[18px] font-suit font-bold text-gray-900 text-right flex-1">{fmt(detailCosts.meal)}원</span></div>
+                                            <div className="pt-2 border-t border-dashed border-gray-300">
+                                                <div className="relative flex flex-col py-2 h-auto">
+                                                    <div className="flex items-center justify-between h-10 w-full relative"><div className="flex items-center w-32"><span className="text-[18px] font-bold text-gray-700">교통비</span><span className="tag-side">왕복</span></div><button onClick={() => setActiveModal('transport')} className={`deduct-btn ${isTransportDeductedVar ? 'active' : ''} animate-pulse-spread`}>감액</button><div className="text-right flex-1">{!isTransportDeductedVar ? <div className="flex items-center justify-end gap-1"><input type="text" inputMode="numeric" value={manualMainTransport === null ? '' : fmt(manualMainTransport)} onChange={(e) => { const val = e.target.value.replace(/,/g, ''); if (val === '' || !isNaN(val)) setManualMainTransport(Number(val)); }} className="ship-fare-input text-[18px] w-28 text-right font-bold" /><span className="text-[18px] text-gray-900 font-bold">원</span></div> : <span className="text-[18px] font-bold text-gray-400">0원</span>}</div></div>
+                                                    {result.surcharge > 0 && !isTransportDeductedVar && <div className="w-full text-right mt-1"><span className="text-[11px] text-blue-500 font-medium font-pretendard">농어촌버스 {fmt(result.surcharge * 2)}원 포함</span></div>}
+                                                </div>
+                                                {(result.isShipOnlyRoute || shipFare > 0) && (
+                                                    <div className="relative flex flex-col py-2 mt-1 h-auto">
+                                                        <div className="flex items-center justify-between h-10 w-full relative">
+                                                            <div className="flex items-center w-40">
+                                                                <span className="text-[18px] font-bold text-gray-600 tracking-tight">기타교통비</span>
+                                                                <span className="text-lg ml-1">🚢</span>
+                                                            </div>
+                                                            <div className="deduct-btn invisible">감액</div>
+                                                            <div className="text-right flex-1">
+                                                                <div className="flex items-center justify-end gap-1">
+                                                                    <input type="text" inputMode="numeric" value={shipFare === 0 ? '' : fmt(shipFare)} onChange={(e) => { const val = e.target.value.replace(/,/g, ''); if (val === '' || !isNaN(val)) setShipFare(Number(val)); }} placeholder="0" className="ship-fare-input text-[18px] w-28 text-right font-bold" />
+                                                                    <span className="text-[18px] text-gray-600 font-bold">원</span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        {result.shipCost > 0 && (
+                                                            <div className="w-full text-right mt-1">
+                                                                <span className="text-[11px] text-blue-500 font-medium font-pretendard">여객선 {fmt(result.shipCost * 2)}원 포함</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div className="pt-4 border-t-2 border-gray-400 flex justify-between items-center"><span className="font-bold text-gray-900 text-[18px]">총 지급액</span><span className="text-[22px] font-suit font-bold text-teal-700">{fmt(detailCosts.total)}<span className="text-[18px] text-teal-700 ml-1">원</span></span></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                        
+                        <div className="mt-4 px-2 py-4 bg-white/30 border border-white/20 rounded-xl text-center backdrop-blur-sm shadow-sm">
+                            <a href="https://padlet.com/jbyhee/hyonu-s-padlet-4m26339lwedx23dc" target="_blank" rel="noopener noreferrer" className="text-xs font-bold text-gray-600 flex items-center justify-center gap-2 hover:text-teal-700 transition-colors">
+                                <span>💬 정보 수정 및 건의 (Padlet)</span>
+                            </a>
+                            <p className="text-[10px] font-bold text-gray-500 mt-2 font-pretendard">Crafted with Passion by JHN@전남교육</p>
+                        </div>
+                    </main>
+
+                    {/* Intra-city Modal */}
+                    {intraCityOpen && (
+                        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setIntraCityOpen(false)}>
+                            <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden animate-slide-up" onClick={e => e.stopPropagation()}>
+                                <div className="p-6">
+                                    <div className="flex justify-between items-center mb-6">
+                                        <h3 className="font-bold text-xl text-gray-800">관내 출장 여비 (참고)</h3>
+                                        <button onClick={() => setIntraCityOpen(false)} className="text-gray-400 hover:text-gray-600"><Icons.X size={22} /></button>
+                                    </div>
+                                    <div className="space-y-5">
+                                        <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                                            <span className="text-lg font-bold text-gray-700">기본 정액</span>
+                                            <span className="text-lg font-suit font-bold text-gray-900">20,000원</span>
+                                        </div>
+                                        <div className="flex justify-between items-center py-2">
+                                            <span className="text-base font-bold text-gray-600">4시간 미만 (½ 감액)</span>
+                                            <Toggle checked={intraDeductions.shortTime} onChange={(val) => setIntraDeductions(p => ({...p, shortTime: val}))} />
+                                        </div>
+                                        <div className="flex justify-between items-center py-2">
+                                            <span className="text-base font-bold text-gray-600">관용차량 이용 (½ 감액)</span>
+                                            <Toggle checked={intraDeductions.govVehicle} onChange={(val) => setIntraDeductions(p => ({...p, govVehicle: val}))} />
+                                        </div>
+                                        <div className="mt-8 pt-6 border-t-2 border-gray-200 flex justify-between items-center">
+                                            <span className="text-xl font-bold text-gray-900">지급 대상액</span>
+                                            <span className="text-2xl font-suit font-bold text-blue-600">
+                                                {fmt(20000 - (intraDeductions.shortTime ? 10000 : 0) - (intraDeductions.govVehicle ? 10000 : 0))}원
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <button onClick={() => setIntraCityOpen(false)} className="btn-metallic-blue w-full mt-10 h-14 rounded-xl font-bold text-lg">닫기</button>
+                                </div>
                             </div>
                         </div>
-                        <AutocompleteInput 
-                            label="도착 기관" 
-                            value={destination} 
-                            onChange={setDestination} 
-                            onSelect={setDestination} 
-                            list={institutions} 
-                        />
-                    </div>
+                    )}
 
-                    {/* 결과 카드 (Flip UI) */}
-                    <div className="perspective-1000 h-[420px] w-full relative z-10">
-                        <div className={`flip-card-inner ${isFlipped ? 'is-flipped' : ''}`}>
-                            
-                            {/* FRONT: 편도 교통비 & 거리 (요청하신 부분) */}
-                            <div className="flip-card-front flex flex-col justify-between p-8 border border-gray-100">
-                                <div>
-                                    <div className="flex justify-between items-start mb-8">
-                                        <span className="text-xs font-bold text-[#00BFA5] bg-teal-50 px-2 py-1 rounded-md">편도 기준</span>
-                                        {costs.ferryFare > 0 && <span className="text-[10px] font-bold text-blue-500 bg-blue-50 px-2 py-1 rounded-md">도서지역 승선료 포함</span>}
+                    {/* Standard Detail Modals */}
+                    {activeModal && (
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => setActiveModal(null)}>
+                            <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl animate-slide-up" onClick={e => e.stopPropagation()}>
+                                <div className="p-5">
+                                    <div className="flex justify-between items-center mb-4"><h3 className="font-bold text-lg text-gray-800">{activeModal === 'daily' ? '일비' : activeModal === 'meal' ? '식비' : '교통비'} 상세 감액</h3><button onClick={() => setActiveModal(null)}><Icons.X size={20} /></button></div>
+                                    <div className="space-y-3">
+                                        {(activeModal === 'daily' ? [ { id: 'gov_vehicle', label: "관용차량 이용 (½ 감액)", subLabel: "(임차버스, 통학버스 포함)" } ] :
+                                          activeModal === 'meal' ? [ { id: 'meal_1', label: "1식 감액" }, { id: 'meal_2', label: "2식 감액" }, { id: 'meal_3', label: "전액 감액" }, { id: 'meal_half', label: "½ 감액" } ] :
+                                          [ { id: 'transport_proof', label: "증거서류 미제출" }, { id: 'transport_gov_vehicle', label: "관용/임차차량 이용" }, { id: 'transport_passenger', label: "동료 차량 동승" } ]
+                                        ).map(item => (<div key={item.id} className="flex justify-between items-center py-2 border-b border-gray-50 last:border-0"><div><span className="block text-sm font-bold text-gray-700">{item.label}</span>{item.subLabel && <span className="text-[10px] text-gray-400">{item.subLabel}</span>}</div><Toggle checked={deductions[item.id]} onChange={() => {
+                                            const id = item.id;
+                                            setDeductions(prev => {
+                                                const newState = { ...prev };
+                                                if (['meal_1', 'meal_2', 'meal_3', 'meal_half'].includes(id)) { if (!prev[id]) { newState['meal_1'] = false; newState['meal_2'] = false; newState['meal_3'] = false; newState['meal_half'] = false; } }
+                                                newState[id] = !prev[id];
+                                                if (id === 'gov_vehicle') newState['transport_gov_vehicle'] = newState[id];
+                                                if (id === 'transport_gov_vehicle') newState['gov_vehicle'] = newState[id];
+                                                return newState;
+                                            });
+                                        }} /></div>))}
                                     </div>
-                                    <div className="text-center">
-                                        <p className="text-xs font-bold text-gray-400 mb-1">예상 편도 거리</p>
-                                        <div className="flex justify-center items-baseline gap-1 mb-6">
-                                            <h2 className="text-5xl font-black text-gray-900">{distance}</h2>
-                                            <span className="text-lg font-bold text-gray-400">km</span>
-                                        </div>
-                                        
-                                        <div className="w-full border-t border-dashed border-gray-200 my-6"></div>
-
-                                        <p className="text-xs font-bold text-gray-400 mb-1">편도 교통비 (운임)</p>
-                                        <h2 className="text-4xl font-black text-gray-900">
-                                            {(costs.oneWayTransport + costs.ferryFare).toLocaleString()}
-                                            <span className="text-lg font-medium text-gray-400 ml-1">원</span>
-                                        </h2>
-                                    </div>
-                                </div>
-                                <button 
-                                    onClick={() => setIsFlipped(true)} 
-                                    className="w-full py-4 bg-[#00BFA5] text-white rounded-2xl font-bold text-sm shadow-lg shadow-teal-100 animate-pulse-attention active:scale-95 transition-transform"
-                                >
-                                    여비 계산 (일비/식비 포함)
-                                </button>
-                            </div>
-
-                            {/* BACK: 상세 여비 계산 & 감액 설정 */}
-                            <div className="flip-card-back p-6 border-2 border-[#00BFA5]/20 bg-white">
-                                <div className="flex justify-between items-center mb-6">
-                                    <h3 className="font-bold text-gray-900">여비 상세 명세서</h3>
-                                    <button onClick={() => setIsFlipped(false)} className="text-xs font-bold text-gray-400 hover:text-gray-600">
-                                        <Icons.Refresh /> 다시 조회
-                                    </button>
-                                </div>
-
-                                {/* 감액 토글 섹션 */}
-                                <div className="space-y-3 mb-6">
-                                    <button 
-                                        onClick={() => setDeductions(p => ({...p, gov_vehicle: !p.gov_vehicle}))}
-                                        className={`w-full flex justify-between items-center p-3 rounded-xl border transition-all ${deductions.gov_vehicle ? 'border-[#00BFA5] bg-teal-50 text-[#00796B]' : 'border-gray-100 bg-white text-gray-500'}`}
-                                    >
-                                        <span className="text-xs font-bold">관용차량 이용 (일비 50% 감액)</span>
-                                        <div className={`w-4 h-4 rounded-full border ${deductions.gov_vehicle ? 'bg-[#00BFA5] border-[#00BFA5]' : 'bg-white border-gray-300'}`}></div>
-                                    </button>
-                                    
-                                    <div className="flex items-center justify-between p-3 rounded-xl border border-gray-100 bg-white">
-                                        <span className="text-xs font-bold text-gray-500">식사 제공 (식비 감액)</span>
-                                        <select 
-                                            className="text-xs font-bold bg-transparent outline-none text-right"
-                                            value={deductions.meal_count}
-                                            onChange={(e) => setDeductions(p => ({...p, meal_count: parseInt(e.target.value)}))}
-                                        >
-                                            <option value="0">해당 없음</option>
-                                            <option value="1">1식 제공</option>
-                                            <option value="2">2식 제공</option>
-                                            <option value="3">3식 제공</option>
-                                        </select>
-                                    </div>
-                                </div>
-
-                                {/* 계산 결과 테이블 */}
-                                <div className="space-y-3 pt-2">
-                                    <div className="flex justify-between text-sm">
-                                        <span className="text-gray-500 font-medium">일비 (Daily)</span>
-                                        <span className="font-bold text-gray-900">{costs.daily.toLocaleString()}원</span>
-                                    </div>
-                                    <div className="flex justify-between text-sm">
-                                        <span className="text-gray-500 font-medium">식비 (Meal)</span>
-                                        <span className="font-bold text-gray-900">{costs.meal.toLocaleString()}원</span>
-                                    </div>
-                                    <div className="flex justify-between text-sm">
-                                        <div className="flex items-center gap-1">
-                                            <span className="text-gray-500 font-medium">교통비 (왕복)</span>
-                                            {costs.ferryFare > 0 && <span className="text-[9px] text-blue-500 font-bold bg-blue-50 px-1 rounded">船포함</span>}
-                                        </div>
-                                        <span className="font-bold text-gray-900">{costs.totalTransport.toLocaleString()}원</span>
-                                    </div>
-                                    
-                                    <div className="border-t border-dashed border-gray-200 my-3"></div>
-                                    
-                                    <div className="flex justify-between items-center">
-                                        <span className="font-bold text-lg text-gray-900">총 지급액</span>
-                                        <span className="font-black text-2xl text-[#00BFA5]">{costs.total.toLocaleString()}<span className="text-sm font-medium text-gray-400 ml-1">원</span></span>
-                                    </div>
+                                    <button onClick={() => setActiveModal(null)} className="btn-metallic-blue w-full mt-6 h-12 rounded-xl font-bold">확인</button>
                                 </div>
                             </div>
                         </div>
-                    </div>
+                    )}
 
-                    <footer className="mt-auto pt-6 text-center">
-                        <p className="text-[10px] text-gray-300 font-bold">
-                            Powered by yeobi_easy engine v4.0<br/>
-                            Based on 2026 JNE Guidelines
-                        </p>
-                    </footer>
+                    {/* Regional Sub-selection Modal */}
+                    {modalState.type && (
+                        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setModalState({ type: null, data: [] })}>
+                            <div className="bg-white rounded-2xl w-full max-w-xs shadow-2xl overflow-hidden animate-slide-up" onClick={e => e.stopPropagation()}>
+                                <div className="bg-slate-800 p-4 flex items-center justify-between text-white"><h2 className="font-bold">세부 지역 선택</h2><button onClick={() => setModalState({ type: null, data: [] })}><Icons.X size={20} /></button></div>
+                                <div className="p-4 grid grid-cols-2 gap-2 max-h-[60vh] overflow-y-auto custom-scroll">{modalState.data.map(name => (<button key={name} onClick={() => { if (modalState.type === 'origin') { setOrigin(name); if (destination) performCalculation(name, destination); } else { setDestination(name); if (origin) performCalculation(origin, name); } setModalState({ type: null, data: [] }); }} className="flex items-center justify-center gap-1 px-2 py-3 rounded-lg bg-gray-50 border border-gray-100 text-sm font-bold text-gray-700 active:scale-95">{name}</button>))}</div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             );
         };
+
+        const Toggle = ({ checked, onChange }) => (
+            <button onClick={() => onChange(!checked)} className={`w-10 h-5 rounded-full transition-colors relative ${checked ? 'bg-blue-500' : 'bg-gray-300'}`}>
+                <span className={`absolute top-0.5 left-0.5 bg-white w-4 h-4 rounded-full transition-transform shadow-sm ${checked ? 'translate-x-5' : 'translate-x-0'}`} />
+            </button>
+        );
 
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
