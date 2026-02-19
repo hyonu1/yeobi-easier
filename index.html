@@ -70,6 +70,16 @@ const App = () => {
     return null;
   };
 
+  // 홈 버튼 클릭 시 초기화 (출발지만 유지)
+  const handleHomeReset = () => {
+    setEndQuery('');
+    setResult(null);
+    setShowDetails(false);
+    setIsManualInJurisdiction(false);
+    setIsInModalOpen(false);
+    setIntraDeductions({ short: false, vehicle: false });
+  };
+
   const handleSwitchToggle = () => {
     const nextState = !isManualInJurisdiction;
     setIsManualInJurisdiction(nextState);
@@ -244,7 +254,6 @@ const App = () => {
                     {!showDetails ? <ChevronDown size={24} /> : <ChevronUp size={24} />}
                   </button>
 
-                  {/* 상세 정렬 섹션: 줄맞춤 및 자릿수 최적화 */}
                   <div className={`overflow-hidden transition-all duration-500 ${showDetails ? 'max-h-[800px] border-t border-gray-100' : 'max-h-0'}`}>
                     <div className="p-5 space-y-2 bg-gray-50">
                       <DetailStaticRow label="일비" value={result.dailyAllowance} />
@@ -268,7 +277,6 @@ const App = () => {
                     </div>
                   </div>
 
-                  {/* Route Detail */}
                   <div className="p-4 bg-white border-t border-gray-100">
                     <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl shadow-inner">
                       <div className="flex justify-between items-center mb-3 border-b border-gray-200 pb-2">
@@ -352,8 +360,11 @@ const App = () => {
           )}
         </div>
 
-        {/* Home Button Container */}
-        <div className="h-[70px] bg-black flex items-center justify-center border-t border-[#111] shrink-0">
+        {/* Home Button Container - 클릭 시 출발지 제외 초기화 */}
+        <div 
+          onClick={handleHomeReset}
+          className="h-[70px] bg-black flex items-center justify-center border-t border-[#111] shrink-0 cursor-pointer active:opacity-70 transition-opacity"
+        >
           <div className="w-14 h-14 rounded-full border-[3px] border-[#222] flex items-center justify-center">
             <div className="w-5 h-5 border-[2px] border-[#222] rounded-[6px]"></div>
           </div>
