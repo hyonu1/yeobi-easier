@@ -4192,11 +4192,11 @@
                         {!intraCityOpen ? (
                             <>
                                 <section className="space-y-5">
-                                    <AutocompleteInput label="출발지" placeholder="주소/상호명 입력" value={origin} onChange={setOrigin} onSelect={setOrigin} />
+                                    <AutocompleteInput label="출발지" placeholder="예: 서울성북구" value={origin} onChange={setOrigin} onSelect={setOrigin} />
                                     
                                     {waypoints.map((waypoint, index) => (
                                         <div key={index} className="relative">
-                                            <AutocompleteInput label={`경유지 ${index + 1}`} placeholder="주소명, 상호명 입력" value={waypoint} onChange={(val) => updateWaypoint(index, val)} onSelect={(val) => updateWaypoint(index, val)} />
+                                            <AutocompleteInput label={`경유지 ${index + 1}`} placeholder="예: 광주북구" value={waypoint} onChange={(val) => updateWaypoint(index, val)} onSelect={(val) => updateWaypoint(index, val)} />
                                             <button onClick={() => removeWaypoint(index)} className="absolute top-2 right-2 w-8 h-8 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center transition-colors z-10 shadow-md"><Icons.X size={18} /></button>
                                         </div>
                                     ))}
