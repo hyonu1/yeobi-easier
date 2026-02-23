@@ -1,421 +1,1719 @@
-import React, { useState, useEffect } from 'react';
-import { Search, ChevronDown, ChevronUp, X, Calculator, Check, MapPin } from 'lucide-react';
-
-const App = () => {
-  const [startQuery, setStartQuery] = useState('');
-  const [endQuery, setEndQuery] = useState('');
-  const [result, setResult] = useState(null);
-  const [showDetails, setShowDetails] = useState(false);
-  const [isManualInJurisdiction, setIsManualInJurisdiction] = useState(false);
-  const [isInModalOpen, setIsInModalOpen] = useState(false);
-  
-  // 관내 감액 중복 선택 상태 (4시간 미만, 관용차량)
-  const [intraDeductions, setIntraDeductions] = useState({
-    short: false,
-    vehicle: false
-  });
-  
-  const [currentTime, setCurrentTime] = useState(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  // --- 전국 교육지원청 및 터미널 데이터베이스 (실무 명칭 체계 적용) ---
-  const REGION_TO_OFFICE = {
-    "서울서대문구": "서울서부교육지원청",
-    "서울은평구": "서울서부교육지원청",
-    "서울마포구": "서울서부교육지원청",
-    "서울성동구": "서울동부교육지원청",
-    "서울광진구": "서울동부교육지원청",
-    "광주서구": "광주서부교육지원청",
-    "광주남구": "광주서부교육지원청",
-    "광주광산구": "광주서부교육지원청",
-    "전남목포": "목포교육지원청",
-    "전남신안": "신안교육지원청",
-    "전남완도": "완도교육지원청",
-    "전남남악": "목포교육지원청"
-  };
-
-  const OFFICE_TO_TERMINAL = {
-    "서울서부교육지원청": "서울남부",
-    "서울동부교육지원청": "서울경부",
-    "광주서부교육지원청": "광주유스퀘어",
-    "광주동부교육지원청": "광주유스퀘어",
-    "목포교육지원청": "목포종합",
-    "신안교육지원청": "목포종합",
-    "완도교육지원청": "완도공용"
-  };
-
-  const TERMINAL_ROUTES = {
-    "서울경부": { "광주유스퀘어": 32200, "목포종합": 38000 },
-    "서울남부": { "광주유스퀘어": 31000 },
-    "광주유스퀘어": { "서울경부": 32200, "서울남부": 31000, "목포종합": 8200, "완도공용": 16500 },
-    "목포종합": { "광주유스퀘어": 8200, "서울경부": 38000, "완도공용": 12000 },
-    "완도공용": { "광주유스퀘어": 16500, "목포종합": 12000 }
-  };
-
-  const findTerminalPath = (startTerm, endTerm) => {
-    if (TERMINAL_ROUTES[startTerm] && TERMINAL_ROUTES[startTerm][endTerm]) {
-      return { cost: TERMINAL_ROUTES[startTerm][endTerm], path: [startTerm, endTerm] };
-    }
-    for (let mid in TERMINAL_ROUTES[startTerm]) {
-      if (TERMINAL_ROUTES[mid] && TERMINAL_ROUTES[mid][endTerm]) {
-        return { cost: TERMINAL_ROUTES[startTerm][mid] + TERMINAL_ROUTES[mid][endTerm], path: [startTerm, mid, endTerm] };
-      }
-    }
-    return null;
-  };
-
-  // 홈 버튼 클릭 시 초기화 (출발지만 유지)
-  const handleHomeReset = () => {
-    setEndQuery('');
-    setResult(null);
-    setShowDetails(false);
-    setIsManualInJurisdiction(false);
-    setIsInModalOpen(false);
-    setIntraDeductions({ short: false, vehicle: false });
-  };
-
-  const handleSwitchToggle = () => {
-    const nextState = !isManualInJurisdiction;
-    setIsManualInJurisdiction(nextState);
-    if (nextState) {
-      const startOff = REGION_TO_OFFICE[startQuery] || "미지정 지원청";
-      setResult({
-        type: 'IN',
-        fixedAllowance: 20000,
-        path: "수동 관내 설정",
-        offices: startOff
-      });
-      setIntraDeductions({ short: false, vehicle: false });
-      setIsInModalOpen(true);
-    }
-  };
-
-  const handleCalculate = () => {
-    if (!startQuery || !endQuery) return;
-    const startOff = REGION_TO_OFFICE[startQuery];
-    const endOff = REGION_TO_OFFICE[endQuery];
-    if (!startOff || !endOff) return;
-
-    const isAutoIn = (startOff === endOff);
-    if (isAutoIn) {
-      setResult({
-        type: 'IN',
-        fixedAllowance: 20000,
-        path: "관할 구역(지원청) 내 이동",
-        offices: startOff
-      });
-      setIntraDeductions({ short: false, vehicle: false });
-      setIsInModalOpen(true);
-      setShowDetails(false);
-    } else {
-      const startTerm = OFFICE_TO_TERMINAL[startOff];
-      const endTerm = OFFICE_TO_TERMINAL[endOff];
-      const route = findTerminalPath(startTerm, endTerm);
-      if (!route) return;
-      setResult({
-        type: 'OUT',
-        oneWayFare: route.cost,
-        dailyAllowance: 25000,
-        mealAllowance: 25000,
-        roundTripFare: route.cost * 2,
-        otherFare: 0,
-        path: route.path.join(" → ")
-      });
-      setIsInModalOpen(false);
-      setShowDetails(false);
-    }
-    setIsManualInJurisdiction(false);
-  };
-
-  const closeInModal = () => {
-    setIsInModalOpen(false);
-    setIsManualInJurisdiction(false);
-  };
-
-  const handleUpdateFare = (field, value) => {
-    const numValue = parseInt(value.replace(/[^0-9]/g, '')) || 0;
-    setResult(prev => ({ ...prev, [field]: numValue }));
-  };
-
-  const calculateTotal = () => {
-    if (!result) return 0;
-    if (result.type === 'IN') {
-      let total = result.fixedAllowance;
-      if (intraDeductions.short) total -= 10000;
-      if (intraDeductions.vehicle) total -= 10000;
-      return total;
-    }
-    return result.dailyAllowance + result.mealAllowance + result.roundTripFare + result.otherFare;
-  };
-
-  const toggleDeduction = (key) => {
-    setIntraDeductions(prev => ({
-      ...prev,
-      [key]: !prev[key]
-    }));
-  };
-
-  return (
-    <div className="min-h-screen bg-[#1c1c1c] flex items-center justify-center p-0 md:p-4 font-sans select-none text-gray-900 overflow-hidden">
-      <div className="w-full max-w-[500px] h-screen md:h-[880px] bg-[#000000] rounded-none md:rounded-[60px] border-none md:border-[8px] border-[#333333] relative shadow-2xl overflow-hidden flex flex-col box-content">
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>yeobi-easier by 전현우</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script>
+        window.tailwind.config = {
+            theme: {
+                extend: {
+                    animation: {
+                        'pulse-spread': 'pulse-spread 2s infinite',
+                        'slide-up': 'slideUpModal 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+                        'twinkle-text': 'twinkle 1.5s infinite ease-in-out',
+                        'fade-in': 'fadeIn 0.3s ease-out',
+                    },
+                    keyframes: {
+                        'pulse-spread': { '0%': { boxShadow: '0 0 0 0 rgba(0, 122, 255, 0.5)' }, '70%': { boxShadow: '0 0 0 10px rgba(0, 122, 255, 0)' }, '100%': { boxShadow: '0 0 0 0 rgba(0, 122, 255, 0)' } },
+                        'slideUpModal': { 'from': { transform: 'translateY(20px)', opacity: '0' }, 'to': { transform: 'translateY(0)', opacity: '1' } },
+                        'twinkle': { '0%, 100%': { opacity: '1' }, '50%': { opacity: '0.6' } },
+                        'fadeIn': { 'from': { opacity: '0' }, 'to': { opacity: '1' } }
+                    },
+                    fontFamily: {
+                        'gmarket': ['GmarketSansMedium', 'sans-serif'],
+                        'pretendard': ['Pretendard', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+        @import url('https://fastly.jsdelivr.net/gh/projectnoonnu/noonfonts_2001@1.1/GmarketSansMedium.css');
         
-        {/* Status Bar */}
-        <div className="h-7 bg-black flex justify-between items-center px-6 text-[11px] text-white shrink-0">
-          <div className="flex items-center gap-1">
-            <span className="text-[10px] opacity-90 tracking-tighter uppercase font-bold">by JHN for JNE</span>
-          </div>
-          <div className="font-bold tracking-widest text-[12px]">{currentTime}</div>
-          <div className="flex items-center gap-1">
-            <span className={`text-[9px] ${!isManualInJurisdiction ? 'text-blue-400 font-bold' : 'opacity-40'}`}>관외</span>
-            <div 
-              onClick={handleSwitchToggle}
-              className={`w-8 h-4 rounded-full p-0.5 cursor-pointer transition-colors duration-200 border border-white/10 ${isManualInJurisdiction ? 'bg-green-500' : 'bg-gray-700'}`}
-            >
-              <div className={`w-3 h-3 bg-white rounded-full shadow-sm transform transition-transform duration-200 ${isManualInJurisdiction ? 'translate-x-4' : ''}`}></div>
-            </div>
-            <span className={`text-[9px] ${isManualInJurisdiction ? 'text-green-400 font-bold' : 'opacity-40'}`}>관내</span>
-          </div>
-        </div>
+        :root {
+            --color-blue: #007AFF;
+            --color-blue-dark: #0056D6;
+            --color-blue-light: #5AC8FA;
+            --color-bg-base: #F2F2F7;
+            --color-text-main: #191F28;
+            --color-accent: #34C759;
+            --ios-gray-1: #F2F2F7;
+            --ios-gray-2: #E5E5EA;
+            --ios-separator: rgba(60, 60, 67, 0.12);
+        }
 
-        {/* Header */}
-        <div className="h-14 bg-gradient-to-b from-[#7d7d7d] via-[#4d4d4d] to-[#1a1a1a] flex items-center justify-center border-b border-black shrink-0">
-          <h1 className="text-white font-bold text-2xl drop-shadow-md italic tracking-tight uppercase">yeobi-easier</h1>
-        </div>
+        body { 
+            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(to bottom, var(--ios-gray-1) 0%, var(--ios-gray-2) 100%);
+            color: var(--color-text-main);
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            min-height: 100vh;
+            overflow-y: scroll;
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+        }
 
-        {/* Screen Content */}
-        <div className="flex-1 bg-[#dcdcdc] overflow-y-auto custom-scrollbar relative">
-          <div className="absolute inset-0 opacity-5 pointer-events-none bg-[radial-gradient(#000_1px,transparent_1px)] [background-size:20px_20px]"></div>
+        .main-wrapper { 
+            width: 100%;
+            max-width: 480px;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            background-color: #FFFFFF;
+            position: relative;
+            box-shadow: 0 0 30px rgba(0,0,0,0.08);
+        }
 
-          <div className="p-6 space-y-5 relative pb-10">
-            {/* Input Section */}
-            <div className="space-y-3">
-              <div className="relative">
-                <label className="block text-[10px] font-black text-gray-500 mb-1 ml-1 uppercase tracking-widest leading-none">Departure</label>
-                <div className="relative">
-                   <select 
-                    value={startQuery}
-                    onChange={(e) => setStartQuery(e.target.value)}
-                    className="w-full h-11 bg-white border border-gray-400 rounded-xl pl-4 pr-10 text-gray-800 shadow-inner appearance-none focus:outline-none text-base font-bold transition-all"
-                  >
-                    <option value="">출발 지역 선택</option>
-                    {Object.keys(REGION_TO_OFFICE).map(r => <option key={r} value={r}>{r}</option>)}
-                  </select>
-                  <Search className="absolute right-4 top-3 text-gray-400" size={18} />
+        @media (min-width: 768px) {
+            body { align-items: center; padding: 24px 0; box-sizing: border-box; }
+            .main-wrapper { 
+                min-height: unset;
+                height: auto;
+                max-height: calc(100vh - 48px);
+                border-radius: 32px;
+                box-shadow: 0 20px 60px rgba(0, 122, 255, 0.15), 0 0 1px rgba(0,0,0,0.1);
+                overflow-y: auto;
+            }
+        }
+
+        .font-gmarket { font-family: 'GmarketSansMedium', sans-serif; }
+
+        .input-group { 
+            background: #FFFFFF;
+            border-radius: 16px;
+            padding: 0 20px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            width: 100%;
+            height: 84px;
+            border: 2px solid rgba(0, 122, 255, 0.2);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06), 0 2px 8px rgba(0, 122, 255, 0.08);
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .input-group:focus-within { 
+            border-color: var(--color-blue);
+            box-shadow: 0 0 0 4px rgba(0, 122, 255, 0.15), 0 6px 20px rgba(0, 0, 0, 0.08);
+            background: #FFFFFF;
+        }
+
+        .header-teal {
+            background: linear-gradient(to bottom, rgba(255, 255, 255, 0.98) 0%, rgba(249, 249, 249, 0.95) 100%);
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            padding: 18px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 0.5px solid var(--ios-separator);
+            position: relative;
+            z-index: 40;
+        }
+
+        .mode-switch-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--ios-gray-1);
+            border-radius: 99px;
+            width: 120px;
+            height: 40px;
+            position: relative;
+            cursor: pointer;
+            padding: 3px;
+        }
+        .mode-switch-slider {
+            position: absolute;
+            top: 3px;
+            bottom: 3px;
+            width: calc(50% - 3px);
+            background: linear-gradient(135deg, #FFFFFF 0%, #F5F5F5 100%);
+            border-radius: 99px;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15), 0 0 1px rgba(0,0,0,0.1);
+        }
+        .mode-switch-slider.extra { left: 3px; }
+        .mode-switch-slider.intra { left: calc(50%); }
+        .mode-text { 
+            flex: 1;
+            z-index: 10;
+            text-align: center;
+            font-size: 14px;
+            font-weight: 700;
+            transition: color 0.2s;
+        }
+        .mode-text.active { color: var(--color-blue); }
+        .mode-text.inactive { color: #8E8E93; }
+
+        .deduct-btn-mini {
+            font-size: 13px;
+            padding: 0 16px;
+            height: 32px;
+            border-radius: 10px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            background: linear-gradient(135deg, #288CFF 0%, var(--color-blue-dark) 100%);
+            color: #FFFFFF;
+            border: none;
+            box-shadow: 0 2px 8px rgba(0, 122, 255, 0.25);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .deduct-btn-mini:active {
+            transform: scale(0.95);
+        }
+        .deduct-btn-mini.active { 
+            background: var(--ios-gray-1);
+            color: #8E8E93;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.06);
+        }
+
+        .btn-3d-teal {
+            background: linear-gradient(135deg, #288CFF 0%, var(--color-blue-dark) 100%);
+            color: white;
+            height: 56px;
+            padding: 0 24px;
+            border-radius: 16px;
+            font-weight: 700;
+            font-size: 17px;
+            box-shadow: 0 4px 14px rgba(0, 122, 255, 0.25);
+            transition: all 0.15s;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            width: 100%;
+            cursor: pointer;
+        }
+        .btn-3d-teal:active {
+            transform: scale(0.98);
+            box-shadow: 0 2px 8px rgba(0, 122, 255, 0.3);
+        }
+        .btn-3d-disabled { 
+            opacity: 0.45;
+            filter: blur(0.3px);
+            box-shadow: 0 2px 8px rgba(0, 122, 255, 0.05);
+            cursor: not-allowed;
+            pointer-events: none;
+            transform: none !important;
+        }
+
+        .map-path-area { 
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center; 
+            height: 100%;
+            width: 100%;
+            transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .path-segment-line { 
+            position: absolute;
+            left: 16px;
+            width: 3px;
+            height: 100%;
+            z-index: 0;
+            border-left: 3px dashed var(--ios-gray-2);
+        }
+
+        .node-row { 
+            display: flex;
+            align-items: center;
+            width: 100%;
+            z-index: 10;
+            position: relative;
+        }
+        
+        .pin-icon { 
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            border: 3px solid white;
+            box-shadow: 0 0 0 2px var(--color-blue);
+            background: var(--color-blue);
+            margin-left: 9px;
+            flex-shrink: 0;
+        }
+        .pin-icon.dest { 
+            box-shadow: 0 0 0 2px var(--color-accent);
+            background: var(--color-accent);
+        }
+        .pin-icon.empty { 
+            background: white;
+            border-color: var(--ios-gray-2);
+            box-shadow: 0 0 0 2px var(--ios-gray-2);
+        }
+        
+        .bus-marker { 
+            width: 22px;
+            height: 22px;
+            background: #FFFFFF;
+            border: 2px solid var(--color-blue);
+            border-radius: 6px;
+            margin-left: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            box-shadow: 0 1px 3px rgba(0, 122, 255, 0.2);
+        }
+        
+        .label-container { 
+            margin-left: 14px;
+            flex-grow: 1;
+        }
+        .terminal-name { 
+            font-size: 14.5px;
+            font-weight: 700;
+            color: var(--color-text-main);
+            line-height: 1.1;
+        }
+        .sub-desc { 
+            font-size: 10px;
+            color: #8E8E93;
+            font-weight: 600;
+            letter-spacing: -0.02em;
+            margin-bottom: 1px;
+        }
+        
+        .floating-fare-box { 
+            position: absolute;
+            left: 45px;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 20;
+        }
+        .floating-fare-badge { 
+            background: linear-gradient(135deg, var(--color-blue) 0%, var(--color-blue-dark) 100%);
+            color: white;
+            font-size: 14px;
+            font-weight: 800;
+            padding: 4px 12px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0, 122, 255, 0.3);
+        }
+
+        .iphone-classic-home-btn {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #F0F8FF 0%, #E6F2FF 100%);
+            border: 1.5px solid rgba(0, 122, 255, 0.15);
+            box-shadow: 
+                0 2px 8px rgba(0, 122, 255, 0.15),
+                inset 0 1px 2px rgba(255, 255, 255, 0.8);
+            position: relative;
+            cursor: pointer;
+            transition: all 0.15s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .iphone-classic-home-btn::after {
+            content: "";
+            width: 24px;
+            height: 24px;
+            border: 2px solid rgba(0, 122, 255, 0.5);
+            border-radius: 4px;
+            transition: all 0.15s;
+        }
+        .iphone-classic-home-btn:active { 
+            transform: scale(0.95);
+            box-shadow: 
+                0 1px 4px rgba(0, 122, 255, 0.2),
+                inset 0 1px 3px rgba(0, 122, 255, 0.1);
+        }
+        .iphone-classic-home-btn:active::after {
+            border-color: rgba(0, 122, 255, 0.8);
+        }
+
+        .bottom-side-btn {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #F8F9FA 0%, #F1F3F5 100%);
+            color: #ADB5BD;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s ease;
+            border: 1px solid rgba(0, 0, 0, 0.04);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.02);
+            cursor: pointer;
+        }
+        .bottom-side-btn:active {
+            transform: scale(0.92);
+            background: #E9ECEF;
+            color: var(--color-blue);
+        }
+
+        .suggestions-box { 
+            position: absolute;
+            left: 0;
+            right: 0;
+            top: 100%;
+            margin-top: 8px;
+            background: #FFFFFF;
+            border-radius: 16px;
+            z-index: 200; 
+            box-shadow: 0 20px 60px rgba(0, 122, 255, 0.15), 0 0 1px rgba(0,0,0,0.1);
+            max-height: 480px;
+            overflow-y: auto;
+            border: 0.5px solid rgba(0, 122, 255, 0.1);
+        }
+        .suggestion-item { 
+            padding: 14px 20px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center; 
+            font-size: 15px;
+            font-weight: 600;
+            border-bottom: 0.5px solid var(--ios-separator);
+            transition: all 0.15s;
+        }
+        .suggestion-item:last-child { border-bottom: none; }
+        .suggestion-item:hover { background-color: rgba(0, 122, 255, 0.05); }
+        .suggestion-item.active { background-color: rgba(0, 122, 255, 0.1); }
+        
+        .toggle-switch { 
+            width: 52px;
+            height: 32px;
+            border-radius: 16px;
+            background: var(--ios-gray-2);
+            position: relative;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .toggle-knob { 
+            width: 28px;
+            height: 28px;
+            background: white;
+            border-radius: 50%;
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        .toggle-active { background: var(--color-blue); }
+        .toggle-inactive { background: var(--ios-gray-2); }
+        .knob-active { left: 22px; }
+
+        .fare-box-input {
+            width: 140px;
+            height: 48px;
+            border: 1.5px solid var(--ios-gray-2);
+            border-radius: 10px;
+            background: var(--ios-gray-1);
+            text-align: right;
+            padding: 0 14px;
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--color-text-main);
+            outline: none;
+            transition: all 0.2s;
+            font-family: 'Pretendard', sans-serif;
+        }
+        .fare-box-input:focus { 
+            border-color: var(--color-blue);
+            background-color: #FFFFFF;
+            box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1);
+        }
+        
+        .fare-box-readonly {
+            width: 140px;
+            height: 48px;
+            text-align: right;
+            padding: 0 14px;
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--color-text-main);
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            font-family: 'Pretendard', sans-serif;
+        }
+
+        .warning-box {
+            background: #FFF3CD;
+            border-left: 4px solid #FF9500;
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin: 16px 0;
+        }
+
+        .warning-title {
+            font-size: 13px;
+            font-weight: 800;
+            color: #B87503;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .warning-item {
+            font-size: 12px;
+            color: #856404;
+            line-height: 1.5;
+            margin-left: 8px;
+            position: relative;
+            padding-left: 12px;
+        }
+
+        .warning-item::before {
+            content: "•";
+            position: absolute;
+            left: 0;
+            font-weight: bold;
+        }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-thumb { 
+            background: var(--ios-gray-2);
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useCallback } = React;
+
+        const FARE_DATA = {
+          "meta": {
+            "version": "3.0",
+            "generated_at": "2026-02-23T00:00:00.000000",
+            "total_regions": 250,
+            "total_hubs": 120
+          },
+          "fares": {
+            "유스퀘어광주터미널→센트럴시티터미널": { "fare": 23800, "bus_type": "express_우등", "is_premium": true },
+            "유스퀘어광주터미널→동서울종합터미널": { "fare": 26300, "bus_type": "express_우등", "is_premium": true },
+            "유스퀘어광주터미널→부산서부터미널": { "fare": 22600, "bus_type": "express_우등", "is_premium": true },
+            "유스퀘어광주터미널→대전복합터미널": { "fare": 13200, "bus_type": "express_우등", "is_premium": true },
+            "유스퀘어광주터미널→동대구터미널": { "fare": 19800, "bus_type": "express_우등", "is_premium": true },
+            "유스퀘어광주터미널→인천터미널": { "fare": 28100, "bus_type": "express_우등", "is_premium": true },
+            "유스퀘어광주터미널→전주터미널": { "fare": 8400, "bus_type": "intercity_일반", "is_premium": false },
+            "유스퀘어광주터미널→천안터미널": { "fare": 16500, "bus_type": "express_우등", "is_premium": true },
+            "센트럴시티터미널→유스퀘어광주터미널": { "fare": 23800, "bus_type": "express_우등", "is_premium": true },
+            "동서울종합터미널→유스퀘어광주터미널": { "fare": 26300, "bus_type": "express_우등", "is_premium": true },
+            "부산서부터미널→유스퀘어광주터미널": { "fare": 22600, "bus_type": "express_우등", "is_premium": true },
+            "대전복합터미널→유스퀘어광주터미널": { "fare": 13200, "bus_type": "express_우등", "is_premium": true },
+            "목포터미널→유스퀘어광주터미널": { "fare": 7300, "bus_type": "intercity_일반", "is_premium": false },
+            "여수터미널→유스퀘어광주터미널": { "fare": 12100, "bus_type": "intercity_일반", "is_premium": false },
+            "순천터미널→유스퀘어광주터미널": { "fare": 9200, "bus_type": "intercity_일반", "is_premium": false },
+            "나주터미널→유스퀘어광주터미널": { "fare": 3200, "bus_type": "intercity_일반", "is_premium": false },
+            "해남터미널→유스퀘어광주터미널": { "fare": 11400, "bus_type": "intercity_일반", "is_premium": false },
+            "완도터미널→유스퀘어광주터미널": { "fare": 15200, "bus_type": "intercity_일반", "is_premium": false },
+            "진도터미널→유스퀘어광주터미널": { "fare": 14500, "bus_type": "intercity_일반", "is_premium": false },
+            "남악터미널→유스퀘어광주터미널": { "fare": 5800, "bus_type": "intercity_일반", "is_premium": false },
+            "담양터미널→유스퀘어광주터미널": { "fare": 3800, "bus_type": "intercity_일반", "is_premium": false },
+            "곡성터미널→유스퀘어광주터미널": { "fare": 7200, "bus_type": "intercity_일반", "is_premium": false },
+            "구례터미널→유스퀘어광주터미널": { "fare": 9600, "bus_type": "intercity_일반", "is_premium": false },
+            "고흥터미널→유스퀘어광주터미널": { "fare": 13800, "bus_type": "intercity_일반", "is_premium": false },
+            "보성터미널→유스퀘어광주터미널": { "fare": 10200, "bus_type": "intercity_일반", "is_premium": false },
+            "화순터미널→유스퀘어광주터미널": { "fare": 4200, "bus_type": "intercity_일반", "is_premium": false },
+            "장흥터미널→유스퀘어광주터미널": { "fare": 11800, "bus_type": "intercity_일반", "is_premium": false },
+            "강진터미널→유스퀘어광주터미널": { "fare": 12400, "bus_type": "intercity_일반", "is_premium": false },
+            "영암터미널→유스퀘어광주터미널": { "fare": 8200, "bus_type": "intercity_일반", "is_premium": false },
+            "무안터미널→유스퀘어광주터미널": { "fare": 5800, "bus_type": "intercity_일반", "is_premium": false },
+            "함평터미널→유스퀘어광주터미널": { "fare": 5200, "bus_type": "intercity_일반", "is_premium": false },
+            "영광터미널→유스퀘어광주터미널": { "fare": 8600, "bus_type": "intercity_일반", "is_premium": false },
+            "장성터미널→유스퀘어광주터미널": { "fare": 3400, "bus_type": "intercity_일반", "is_premium": false },
+            "광양터미널→유스퀘어광주터미널": { "fare": 11200, "bus_type": "intercity_일반", "is_premium": false },
+            "유스퀘어광주터미널→목포터미널": { "fare": 7300, "bus_type": "intercity_일반", "is_premium": false },
+            "유스퀘어광주터미널→여수터미널": { "fare": 12100, "bus_type": "intercity_일반", "is_premium": false },
+            "유스퀘어광주터미널→순천터미널": { "fare": 9200, "bus_type": "intercity_일반", "is_premium": false },
+            "유스퀘어광주터미널→나주터미널": { "fare": 3200, "bus_type": "intercity_일반", "is_premium": false },
+            "유스퀘어광주터미널→해남터미널": { "fare": 11400, "bus_type": "intercity_일반", "is_premium": false },
+            "유스퀘어광주터미널→완도터미널": { "fare": 15200, "bus_type": "intercity_일반", "is_premium": false },
+            "유스퀘어광주터미널→진도터미널": { "fare": 14500, "bus_type": "intercity_일반", "is_premium": false },
+            "유스퀘어광주터미널→남악터미널": { "fare": 5800, "bus_type": "intercity_일반", "is_premium": false },
+            "목포터미널→센트럴시티터미널": { "fare": 28500, "bus_type": "express_우등", "is_premium": true },
+            "여수터미널→센트럴시티터미널": { "fare": 31400, "bus_type": "express_우등", "is_premium": true },
+            "순천터미널→센트럴시티터미널": { "fare": 28900, "bus_type": "express_우등", "is_premium": true },
+            "목포터미널→동서울종합터미널": { "fare": 31000, "bus_type": "express_우등", "is_premium": true },
+            "여수터미널→동서울종합터미널": { "fare": 34200, "bus_type": "express_우등", "is_premium": true },
+            "순천터미널→동서울종합터미널": { "fare": 31500, "bus_type": "express_우등", "is_premium": true },
+            "센트럴시티터미널→목포터미널": { "fare": 28500, "bus_type": "express_우등", "is_premium": true },
+            "센트럴시티터미널→여수터미널": { "fare": 31400, "bus_type": "express_우등", "is_premium": true },
+            "센트럴시티터미널→순천터미널": { "fare": 28900, "bus_type": "express_우등", "is_premium": true },
+            "순천터미널→부산서부터미널": { "fare": 17800, "bus_type": "express_우등", "is_premium": true },
+            "여수터미널→부산서부터미널": { "fare": 21500, "bus_type": "express_우등", "is_premium": true },
+            "광양터미널→부산서부터미널": { "fare": 16400, "bus_type": "intercity_일반", "is_premium": false },
+            "목포터미널→해남터미널": { "fare": 5600, "bus_type": "intercity_일반", "is_premium": false },
+            "해남터미널→목포터미널": { "fare": 5600, "bus_type": "intercity_일반", "is_premium": false },
+            "순천터미널→여수터미널": { "fare": 3500, "bus_type": "intercity_일반", "is_premium": false },
+            "여수터미널→순천터미널": { "fare": 3500, "bus_type": "intercity_일반", "is_premium": false },
+            "순천터미널→광양터미널": { "fare": 2800, "bus_type": "intercity_일반", "is_premium": false },
+            "광양터미널→순천터미널": { "fare": 2800, "bus_type": "intercity_일반", "is_premium": false },
+            "목포터미널→남악터미널": { "fare": 2400, "bus_type": "intercity_일반", "is_premium": false },
+            "남악터미널→목포터미널": { "fare": 2400, "bus_type": "intercity_일반", "is_premium": false }
+          },
+          "hubs": {
+            "동서울종합터미널": { "name": "동서울종합터미널", "express_id": "NAEK020", "intercity_id": "NAI0202225", "regions": ["서울강동구", "서울송파구", "서울성동구", "서울광진구", "서울중랑구", "서울동대문구", "서울성북구", "서울강북구", "서울노원구", "서울도봉구"] },
+            "센트럴시티터미널": { "name": "센트럴시티터미널", "express_id": "NAEK010", "intercity_id": "NAI0101010", "regions": ["서울강남구", "서울서초구", "서울중구", "서울용산구", "서울종로구", "서울마포구", "서울서대문구", "서울은평구", "서울양천구", "서울강서구"] },
+            "서울남부터미널": { "name": "서울남부터미널", "express_id": null, "intercity_id": "NAI0101211", "regions": ["서울관악구", "서울동작구", "서울영등포구", "서울금천구", "서울구로구"] },
+            "부산종합버스터미널": { "name": "부산종합버스터미널", "express_id": "NAEK401", "intercity_id": "NAI2601405", "regions": ["부산해운대구", "부산동래구", "부산금정구", "부산연제구", "부산수영구"] },
+            "부산서부터미널": { "name": "부산서부터미널", "express_id": "NAEK400", "intercity_id": "NAI2601408", "regions": ["부산부산진구", "부산사상구", "부산북구", "부산중구", "부산서구", "부산동구", "부산영도구", "부산남구", "부산강서구", "부산기장군"] },
+            "동대구터미널": { "name": "동대구터미널", "express_id": "NAEK200", "intercity_id": "NAI2201405", "regions": ["대구중구", "대구동구", "대구수성구", "대구남구"] },
+            "서대구터미널": { "name": "서대구터미널", "express_id": "NAEK201", "intercity_id": "NAI2201408", "regions": ["대구서구", "대구달서구", "대구달성군"] },
+            "대구북부터미널": { "name": "대구북부터미널", "express_id": null, "intercity_id": "NAI2201412", "regions": ["대구북구"] },
+            "인천터미널": { "name": "인천터미널", "express_id": "NAEK030", "intercity_id": "NAI2301425", "regions": ["인천중구", "인천남동구", "인천부평구", "인천미추홀구", "인천연수구", "인천계양구", "인천서구"] },
+            "강화터미널": { "name": "강화터미널", "express_id": null, "intercity_id": "NAI2308410", "regions": ["인천강화군", "인천옹진군"] },
+            "유스퀘어광주터미널": { "name": "유스퀘어광주터미널", "express_id": "NAEK025", "intercity_id": "NAI2401409", "regions": ["광주동구", "광주서구", "광주남구", "광주북구", "광주광산구"] },
+            "대전복합터미널": { "name": "대전복합터미널", "express_id": "NAEK100", "intercity_id": "NAI3001402", "regions": ["대전동구", "대전중구", "대전서구", "대전대덕구"] },
+            "유성터미널": { "name": "유성터미널", "express_id": null, "intercity_id": "NAI3001405", "regions": ["대전유성구"] },
+            "울산터미널": { "name": "울산터미널", "express_id": "NAEK500", "intercity_id": "NAI2701401", "regions": ["울산중구", "울산남구", "울산동구", "울산북구", "울산울주군"] },
+            "세종터미널": { "name": "세종터미널", "express_id": "NAEK105", "intercity_id": "NAI2901402", "regions": ["세종세종시"] },
+            "수원터미널": { "name": "수원터미널", "express_id": "NAEK040", "intercity_id": "NAI3101402", "regions": ["경기수원시"] },
+            "성남터미널": { "name": "성남터미널", "express_id": "NAEK041", "intercity_id": "NAI3102402", "regions": ["경기성남시"] },
+            "고양터미널": { "name": "고양터미널", "express_id": "NAEK042", "intercity_id": "NAI3118402", "regions": ["경기고양시"] },
+            "용인터미널": { "name": "용인터미널", "express_id": "NAEK043", "intercity_id": "NAI3109402", "regions": ["경기용인시"] },
+            "부천터미널": { "name": "부천터미널", "express_id": null, "intercity_id": "NAI3104402", "regions": ["경기부천시"] },
+            "안산터미널": { "name": "안산터미널", "express_id": "NAEK045", "intercity_id": "NAI3110402", "regions": ["경기안산시"] },
+            "평택터미널": { "name": "평택터미널", "express_id": "NAEK049", "intercity_id": "NAI3108402", "regions": ["경기평택시"] },
+            "의정부터미널": { "name": "의정부터미널", "express_id": null, "intercity_id": "NAI3105402", "regions": ["경기의정부시"] },
+            "안양터미널": { "name": "안양터미널", "express_id": null, "intercity_id": "NAI3103402", "regions": ["경기안양시"] },
+            "광명터미널": { "name": "광명터미널", "express_id": null, "intercity_id": "NAI3106402", "regions": ["경기광명시"] },
+            "시흥터미널": { "name": "시흥터미널", "express_id": null, "intercity_id": "NAI3107402", "regions": ["경기시흥시"] },
+            "광주터미널(경기)": { "name": "광주터미널(경기)", "express_id": null, "intercity_id": "NAI3111402", "regions": ["경기광주시"] },
+            "이천터미널": { "name": "이천터미널", "express_id": "NAEK047", "intercity_id": "NAI3112402", "regions": ["경기이천시"] },
+            "김포터미널": { "name": "김포터미널", "express_id": null, "intercity_id": "NAI3119402", "regions": ["경기김포시"] },
+            "화성터미널": { "name": "화성터미널", "express_id": null, "intercity_id": "NAI3120402", "regions": ["경기화성시"] },
+            "오산터미널": { "name": "오산터미널", "express_id": null, "intercity_id": "NAI3121402", "regions": ["경기오산시"] },
+            "하남터미널": { "name": "하남터미널", "express_id": null, "intercity_id": "NAI3122402", "regions": ["경기하남시"] },
+            "의왕터미널": { "name": "의왕터미널", "express_id": null, "intercity_id": "NAI3123402", "regions": ["경기의왕시"] },
+            "군포터미널": { "name": "군포터미널", "express_id": null, "intercity_id": "NAI3124402", "regions": ["경기군포시"] },
+            "파주터미널": { "name": "파주터미널", "express_id": "NAEK044", "intercity_id": "NAI3125402", "regions": ["경기파주시"] },
+            "양주터미널": { "name": "양주터미널", "express_id": null, "intercity_id": "NAI3126402", "regions": ["경기양주시"] },
+            "구리터미널": { "name": "구리터미널", "express_id": null, "intercity_id": "NAI3127402", "regions": ["경기구리시"] },
+            "남양주터미널": { "name": "남양주터미널", "express_id": null, "intercity_id": "NAI3128402", "regions": ["경기남양주시"] },
+            "포천터미널": { "name": "포천터미널", "express_id": null, "intercity_id": "NAI3129402", "regions": ["경기포천시"] },
+            "동두천터미널": { "name": "동두천터미널", "express_id": null, "intercity_id": "NAI3130402", "regions": ["경기동두천시"] },
+            "안성터미널": { "name": "안성터미널", "express_id": "NAEK048", "intercity_id": "NAI3131402", "regions": ["경기안성시"] },
+            "여주터미널": { "name": "여주터미널", "express_id": null, "intercity_id": "NAI3132402", "regions": ["경기여주시"] },
+            "양평터미널": { "name": "양평터미널", "express_id": null, "intercity_id": "NAI3133402", "regions": ["경기양평군"] },
+            "가평터미널": { "name": "가평터미널", "express_id": null, "intercity_id": "NAI3134402", "regions": ["경기가평군"] },
+            "연천터미널": { "name": "연천터미널", "express_id": null, "intercity_id": "NAI3135402", "regions": ["경기연천군"] },
+            "춘천터미널": { "name": "춘천터미널", "express_id": "NAEK950", "intercity_id": "NAI3201402", "regions": ["강원춘천시"] },
+            "원주터미널": { "name": "원주터미널", "express_id": "NAEK951", "intercity_id": "NAI3202402", "regions": ["강원원주시"] },
+            "강릉터미널": { "name": "강릉터미널", "express_id": "NAEK952", "intercity_id": "NAI3203402", "regions": ["강원강릉시"] },
+            "동해터미널": { "name": "동해터미널", "express_id": "NAEK953", "intercity_id": "NAI3204402", "regions": ["강원동해시"] },
+            "태백터미널": { "name": "태백터미널", "express_id": "NAEK954", "intercity_id": "NAI3205402", "regions": ["강원태백시"] },
+            "속초터미널": { "name": "속초터미널", "express_id": "NAEK955", "intercity_id": "NAI3206402", "regions": ["강원속초시"] },
+            "삼척터미널": { "name": "삼척터미널", "express_id": "NAEK956", "intercity_id": "NAI3207402", "regions": ["강원삼척시"] },
+            "홍천터미널": { "name": "홍천터미널", "express_id": null, "intercity_id": "NAI3208402", "regions": ["강원홍천군"] },
+            "횡성터미널": { "name": "횡성터미널", "express_id": null, "intercity_id": "NAI3209402", "regions": ["강원횡성군"] },
+            "영월터미널": { "name": "영월터미널", "express_id": null, "intercity_id": "NAI3210402", "regions": ["강원영월군"] },
+            "평창터미널": { "name": "평창터미널", "express_id": null, "intercity_id": "NAI3211402", "regions": ["강원평창군"] },
+            "정선터미널": { "name": "정선터미널", "express_id": null, "intercity_id": "NAI3212402", "regions": ["강원정선군"] },
+            "철원터미널": { "name": "철원터미널", "express_id": null, "intercity_id": "NAI3213402", "regions": ["강원철원군"] },
+            "화천터미널": { "name": "화천터미널", "express_id": null, "intercity_id": "NAI3214402", "regions": ["강원화천군"] },
+            "양구터미널": { "name": "양구터미널", "express_id": null, "intercity_id": "NAI3215402", "regions": ["강원양구군"] },
+            "인제터미널": { "name": "인제터미널", "express_id": null, "intercity_id": "NAI3216402", "regions": ["강원인제군"] },
+            "고성터미널(강원)": { "name": "고성터미널(강원)", "express_id": null, "intercity_id": "NAI3217402", "regions": ["강원고성군"] },
+            "양양터미널": { "name": "양양터미널", "express_id": null, "intercity_id": "NAI3218402", "regions": ["강원양양군"] },
+            "청주터미널": { "name": "청주터미널", "express_id": "NAEK900", "intercity_id": "NAI3301402", "regions": ["충북청주시"] },
+            "충주터미널": { "name": "충주터미널", "express_id": "NAEK901", "intercity_id": "NAI3302402", "regions": ["충북충주시"] },
+            "제천터미널": { "name": "제천터미널", "express_id": "NAEK902", "intercity_id": "NAI3303402", "regions": ["충북제천시"] },
+            "보은터미널": { "name": "보은터미널", "express_id": null, "intercity_id": "NAI3304402", "regions": ["충북보은군"] },
+            "옥천터미널": { "name": "옥천터미널", "express_id": null, "intercity_id": "NAI3305402", "regions": ["충북옥천군"] },
+            "영동터미널": { "name": "영동터미널", "express_id": null, "intercity_id": "NAI3306402", "regions": ["충북영동군"] },
+            "증평터미널": { "name": "증평터미널", "express_id": null, "intercity_id": "NAI3307402", "regions": ["충북증평군"] },
+            "진천터미널": { "name": "진천터미널", "express_id": null, "intercity_id": "NAI3308402", "regions": ["충북진천군"] },
+            "괴산터미널": { "name": "괴산터미널", "express_id": null, "intercity_id": "NAI3309402", "regions": ["충북괴산군"] },
+            "음성터미널": { "name": "음성터미널", "express_id": null, "intercity_id": "NAI3310402", "regions": ["충북음성군"] },
+            "단양터미널": { "name": "단양터미널", "express_id": null, "intercity_id": "NAI3311402", "regions": ["충북단양군"] },
+            "천안터미널": { "name": "천안터미널", "express_id": "NAEK110", "intercity_id": "NAI3401402", "regions": ["충남천안시"] },
+            "공주터미널": { "name": "공주터미널", "express_id": "NAEK111", "intercity_id": "NAI3402402", "regions": ["충남공주시"] },
+            "보령터미널": { "name": "보령터미널", "express_id": "NAEK112", "intercity_id": "NAI3403402", "regions": ["충남보령시"] },
+            "아산터미널": { "name": "아산터미널", "express_id": "NAEK113", "intercity_id": "NAI3404402", "regions": ["충남아산시"] },
+            "서산터미널": { "name": "서산터미널", "express_id": "NAEK114", "intercity_id": "NAI3405402", "regions": ["충남서산시"] },
+            "논산터미널": { "name": "논산터미널", "express_id": "NAEK115", "intercity_id": "NAI3406402", "regions": ["충남논산시"] },
+            "계룡터미널": { "name": "계룡터미널", "express_id": null, "intercity_id": "NAI3407402", "regions": ["충남계룡시"] },
+            "당진터미널": { "name": "당진터미널", "express_id": null, "intercity_id": "NAI3408402", "regions": ["충남당진시"] },
+            "금산터미널": { "name": "금산터미널", "express_id": null, "intercity_id": "NAI3409402", "regions": ["충남금산군"] },
+            "부여터미널": { "name": "부여터미널", "express_id": null, "intercity_id": "NAI3410402", "regions": ["충남부여군"] },
+            "서천터미널": { "name": "서천터미널", "express_id": null, "intercity_id": "NAI3411402", "regions": ["충남서천군"] },
+            "청양터미널": { "name": "청양터미널", "express_id": null, "intercity_id": "NAI3412402", "regions": ["충남청양군"] },
+            "홍성터미널": { "name": "홍성터미널", "express_id": null, "intercity_id": "NAI3413402", "regions": ["충남홍성군"] },
+            "예산터미널": { "name": "예산터미널", "express_id": null, "intercity_id": "NAI3414402", "regions": ["충남예산군"] },
+            "태안터미널": { "name": "태안터미널", "express_id": null, "intercity_id": "NAI3415402", "regions": ["충남태안군"] },
+            "전주터미널": { "name": "전주터미널", "express_id": "NAEK600", "intercity_id": "NAI3501402", "regions": ["전북전주시"] },
+            "군산터미널": { "name": "군산터미널", "express_id": "NAEK601", "intercity_id": "NAI3502402", "regions": ["전북군산시"] },
+            "익산터미널": { "name": "익산터미널", "express_id": "NAEK602", "intercity_id": "NAI3503402", "regions": ["전북익산시"] },
+            "정읍터미널": { "name": "정읍터미널", "express_id": "NAEK603", "intercity_id": "NAI3504402", "regions": ["전북정읍시"] },
+            "남원터미널": { "name": "남원터미널", "express_id": "NAEK604", "intercity_id": "NAI3505402", "regions": ["전북남원시"] },
+            "김제터미널": { "name": "김제터미널", "express_id": null, "intercity_id": "NAI3506402", "regions": ["전북김제시"] },
+            "완주터미널": { "name": "완주터미널", "express_id": null, "intercity_id": "NAI3507402", "regions": ["전북완주군"] },
+            "진안터미널": { "name": "진안터미널", "express_id": null, "intercity_id": "NAI3508402", "regions": ["전북진안군"] },
+            "무주터미널": { "name": "무주터미널", "express_id": null, "intercity_id": "NAI3509402", "regions": ["전북무주군"] },
+            "장수터미널": { "name": "장수터미널", "express_id": null, "intercity_id": "NAI3510402", "regions": ["전북장수군"] },
+            "임실터미널": { "name": "임실터미널", "express_id": null, "intercity_id": "NAI3511402", "regions": ["전북임실군"] },
+            "순창터미널": { "name": "순창터미널", "express_id": null, "intercity_id": "NAI3512402", "regions": ["전북순창군"] },
+            "고창터미널": { "name": "고창터미널", "express_id": null, "intercity_id": "NAI3513402", "regions": ["전북고창군"] },
+            "부안터미널": { "name": "부안터미널", "express_id": null, "intercity_id": "NAI3514402", "regions": ["전북부안군"] },
+            "남악터미널": { "name": "남악터미널", "express_id": null, "intercity_id": "NAI3616402", "regions": ["전남남악"] },
+            "목포터미널": { "name": "목포터미널", "express_id": "NAEK300", "intercity_id": "NAI3601402", "regions": ["전남목포시", "전남신안군"] },
+            "여수터미널": { "name": "여수터미널", "express_id": "NAEK310", "intercity_id": "NAI3602402", "regions": ["전남여수시"] },
+            "순천터미널": { "name": "순천터미널", "express_id": "NAEK320", "intercity_id": "NAI3603402", "regions": ["전남순천시"] },
+            "나주터미널": { "name": "나주터미널", "express_id": null, "intercity_id": "NAI3604402", "regions": ["전남나주시"] },
+            "광양터미널": { "name": "광양터미널", "express_id": null, "intercity_id": "NAI3605402", "regions": ["전남광양시"] },
+            "담양터미널": { "name": "담양터미널", "express_id": null, "intercity_id": "NAI3606402", "regions": ["전남담양군"] },
+            "곡성터미널": { "name": "곡성터미널", "express_id": null, "intercity_id": "NAI3607402", "regions": ["전남곡성군"] },
+            "구례터미널": { "name": "구례터미널", "express_id": null, "intercity_id": "NAI3608402", "regions": ["전남구례군"] },
+            "고흥터미널": { "name": "고흥터미널", "express_id": null, "intercity_id": "NAI3609402", "regions": ["전남고흥군"] },
+            "보성터미널": { "name": "보성터미널", "express_id": null, "intercity_id": "NAI3610402", "regions": ["전남보성군"] },
+            "화순터미널": { "name": "화순터미널", "express_id": null, "intercity_id": "NAI3611402", "regions": ["전남화순군"] },
+            "장흥터미널": { "name": "장흥터미널", "express_id": null, "intercity_id": "NAI3612402", "regions": ["전남장흥군"] },
+            "강진터미널": { "name": "강진터미널", "express_id": null, "intercity_id": "NAI3613402", "regions": ["전남강진군"] },
+            "해남터미널": { "name": "해남터미널", "express_id": null, "intercity_id": "NAI3614402", "regions": ["전남해남군"] },
+            "영암터미널": { "name": "영암터미널", "express_id": null, "intercity_id": "NAI3615402", "regions": ["전남영암군"] },
+            "무안터미널": { "name": "무안터미널", "express_id": null, "intercity_id": "NAI3616403", "regions": ["전남무안군"] },
+            "함평터미널": { "name": "함평터미널", "express_id": null, "intercity_id": "NAI3617402", "regions": ["전남함평군"] },
+            "영광터미널": { "name": "영광터미널", "express_id": null, "intercity_id": "NAI3618402", "regions": ["전남영광군"] },
+            "장성터미널": { "name": "장성터미널", "express_id": null, "intercity_id": "NAI3619402", "regions": ["전남장성군"] },
+            "완도터미널": { "name": "완도터미널", "express_id": null, "intercity_id": "NAI3620402", "regions": ["전남완도군"] },
+            "진도터미널": { "name": "진도터미널", "express_id": null, "intercity_id": "NAI3621402", "regions": ["전남진도군"] },
+            "포항터미널": { "name": "포항터미널", "express_id": "NAEK800", "intercity_id": "NAI3701402", "regions": ["경북포항시"] },
+            "경주터미널": { "name": "경주터미널", "express_id": "NAEK810", "intercity_id": "NAI3702402", "regions": ["경북경주시"] },
+            "김천터미널": { "name": "김천터미널", "express_id": "NAEK820", "intercity_id": "NAI3703402", "regions": ["경북김천시"] },
+            "안동터미널": { "name": "안동터미널", "express_id": "NAEK830", "intercity_id": "NAI3704402", "regions": ["경북안동시"] },
+            "구미터미널": { "name": "구미터미널", "express_id": "NAEK840", "intercity_id": "NAI3705402", "regions": ["경북구미시"] },
+            "창원터미널": { "name": "창원터미널", "express_id": "NAEK700", "intercity_id": "NAI3801402", "regions": ["경남창원시"] },
+            "진주터미널": { "name": "진주터미널", "express_id": "NAEK710", "intercity_id": "NAI3802402", "regions": ["경남진주시"] },
+            "김해터미널": { "name": "김해터미널", "express_id": "NAEK720", "intercity_id": "NAI3805402", "regions": ["경남김해시"] },
+            "거제터미널": { "name": "거제터미널", "express_id": null, "intercity_id": "NAI3807402", "regions": ["경남거제시"] },
+            "양산터미널": { "name": "양산터미널", "express_id": "NAEK730", "intercity_id": "NAI3808402", "regions": ["경남양산시"] },
+            "제주터미널": { "name": "제주터미널", "express_id": null, "intercity_id": "NAI3901402", "regions": ["제주제주시"] },
+            "서귀포터미널": { "name": "서귀포터미널", "express_id": null, "intercity_id": "NAI3902402", "regions": ["제주서귀포시"] }
+          },
+          "region_map": {
+            "서울강동구": { "hub": "동서울종합터미널", "office": "서울강동송파교육지원청" },
+            "서울송파구": { "hub": "동서울종합터미널", "office": "서울강동송파교육지원청" },
+            "서울강남구": { "hub": "센트럴시티터미널", "office": "서울강남서초교육지원청" },
+            "서울서초구": { "hub": "센트럴시티터미널", "office": "서울강남서초교육지원청" },
+            "서울성동구": { "hub": "동서울종합터미널", "office": "서울성동광진교육지원청" },
+            "서울광진구": { "hub": "동서울종합터미널", "office": "서울성동광진교육지원청" },
+            "서울중랑구": { "hub": "동서울종합터미널", "office": "서울동대문중랑교육지원청" },
+            "서울동대문구": { "hub": "동서울종합터미널", "office": "서울동대문중랑교육지원청" },
+            "서울성북구": { "hub": "동서울종합터미널", "office": "서울성북강북교육지원청" },
+            "서울강북구": { "hub": "동서울종합터미널", "office": "서울성북강북교육지원청" },
+            "서울노원구": { "hub": "동서울종합터미널", "office": "서울노원교육지원청" },
+            "서울도봉구": { "hub": "동서울종합터미널", "office": "서울도봉교육지원청" },
+            "서울중구": { "hub": "센트럴시티터미널", "office": "서울중부교육지원청" },
+            "서울용산구": { "hub": "센트럴시티터미널", "office": "서울용산교육지원청" },
+            "서울종로구": { "hub": "센트럴시티터미널", "office": "서울종로관악교육지원청" },
+            "서울관악구": { "hub": "서울남부터미널", "office": "서울관악교육지원청" },
+            "서울동작구": { "hub": "서울남부터미널", "office": "서울동작관악교육지원청" },
+            "서울영등포구": { "hub": "서울남부터미널", "office": "서울영등포교육지원청" },
+            "서울금천구": { "hub": "서울남부터미널", "office": "서울금천교육지원청" },
+            "서울구로구": { "hub": "서울남부터미널", "office": "서울구로교육지원청" },
+            "서울마포구": { "hub": "센트럴시티터미널", "office": "서울마포교육지원청" },
+            "서울서대문구": { "hub": "센트럴시티터미널", "office": "서울서대문교육지원청" },
+            "서울은평구": { "hub": "센트럴시티터미널", "office": "서울은평교육지원청" },
+            "서울양천구": { "hub": "센트럴시티터미널", "office": "서울양천교육지원청" },
+            "서울강서구": { "hub": "센트럴시티터미널", "office": "서울강서교육지원청" },
+            "부산해운대구": { "hub": "부산종합버스터미널", "office": "부산해운대교육지원청" },
+            "부산동래구": { "hub": "부산종합버스터미널", "office": "부산동래교육지원청" },
+            "부산금정구": { "hub": "부산종합버스터미널", "office": "부산금정교육지원청" },
+            "부산연제구": { "hub": "부산종합버스터미널", "office": "부산연제교육지원청" },
+            "부산수영구": { "hub": "부산종합버스터미널", "office": "부산수영교육지원청" },
+            "부산부산진구": { "hub": "부산서부터미널", "office": "부산진교육지원청" },
+            "부산사상구": { "hub": "부산서부터미널", "office": "부산사상교육지원청" },
+            "부산북구": { "hub": "부산서부터미널", "office": "부산북구교육지원청" },
+            "부산중구": { "hub": "부산서부터미널", "office": "부산중구교육지원청" },
+            "부산서구": { "hub": "부산서부터미널", "office": "부산서구교육지원청" },
+            "부산동구": { "hub": "부산서부터미널", "office": "부산동구교육지원청" },
+            "부산영도구": { "hub": "부산서부터미널", "office": "부산영도교육지원청" },
+            "부산남구": { "hub": "부산서부터미널", "office": "부산남구교육지원청" },
+            "부산강서구": { "hub": "부산서부터미널", "office": "부산강서교육지원청" },
+            "부산기장군": { "hub": "부산종합버스터미널", "office": "부산기장교육지원청" },
+            "대구중구": { "hub": "동대구터미널", "office": "대구중구교육지원청" },
+            "대구동구": { "hub": "동대구터미널", "office": "대구동구교육지원청" },
+            "대구서구": { "hub": "서대구터미널", "office": "대구서구교육지원청" },
+            "대구북구": { "hub": "대구북부터미널", "office": "대구북구교육지원청" },
+            "대구수성구": { "hub": "동대구터미널", "office": "대구수성교육지원청" },
+            "대구남구": { "hub": "동대구터미널", "office": "대구남구교육지원청" },
+            "대구달서구": { "hub": "서대구터미널", "office": "대구달서교육지원청" },
+            "대구달성군": { "hub": "서대구터미널", "office": "대구달성교육지원청" },
+            "인천중구": { "hub": "인천터미널", "office": "인천중구교육지원청" },
+            "인천남동구": { "hub": "인천터미널", "office": "인천남동교육지원청" },
+            "인천부평구": { "hub": "인천터미널", "office": "인천부평교육지원청" },
+            "인천미추홀구": { "hub": "인천터미널", "office": "인천미추홀교육지원청" },
+            "인천연수구": { "hub": "인천터미널", "office": "인천연수교육지원청" },
+            "인천계양구": { "hub": "인천터미널", "office": "인천계양교육지원청" },
+            "인천서구": { "hub": "인천터미널", "office": "인천서구교육지원청" },
+            "인천강화군": { "hub": "강화터미널", "office": "인천강화교육지원청" },
+            "인천옹진군": { "hub": "강화터미널", "office": "인천옹진교육지원청" },
+            "광주동구": { "hub": "유스퀘어광주터미널", "office": "광주동구교육지원청" },
+            "광주서구": { "hub": "유스퀘어광주터미널", "office": "광주서구교육지원청" },
+            "광주남구": { "hub": "유스퀘어광주터미널", "office": "광주남구교육지원청" },
+            "광주북구": { "hub": "유스퀘어광주터미널", "office": "광주북구교육지원청" },
+            "광주광산구": { "hub": "유스퀘어광주터미널", "office": "광주광산교육지원청" },
+            "대전동구": { "hub": "대전복합터미널", "office": "대전동부교육지원청" },
+            "대전중구": { "hub": "대전복합터미널", "office": "대전중부교육지원청" },
+            "대전서구": { "hub": "대전복합터미널", "office": "대전서부교육지원청" },
+            "대전유성구": { "hub": "유성터미널", "office": "대전유성교육지원청" },
+            "대전대덕구": { "hub": "대전복합터미널", "office": "대전대덕교육지원청" },
+            "울산중구": { "hub": "울산터미널", "office": "울산중구교육지원청" },
+            "울산남구": { "hub": "울산터미널", "office": "울산남구교육지원청" },
+            "울산동구": { "hub": "울산터미널", "office": "울산동구교육지원청" },
+            "울산북구": { "hub": "울산터미널", "office": "울산북구교육지원청" },
+            "울산울주군": { "hub": "울산터미널", "office": "울산울주교육지원청" },
+            "세종세종시": { "hub": "세종터미널", "office": "세종특별자치시교육청" },
+            "경기수원시": { "hub": "수원터미널", "office": "수원교육지원청" },
+            "경기성남시": { "hub": "성남터미널", "office": "성남교육지원청" },
+            "경기고양시": { "hub": "고양터미널", "office": "고양교육지원청" },
+            "경기용인시": { "hub": "용인터미널", "office": "용인교육지원청" },
+            "경기부천시": { "hub": "부천터미널", "office": "부천교육지원청" },
+            "경기안산시": { "hub": "안산터미널", "office": "안산교육지원청" },
+            "경기평택시": { "hub": "평택터미널", "office": "평택교육지원청" },
+            "경기의정부시": { "hub": "의정부터미널", "office": "의정부교육지원청" },
+            "경기안양시": { "hub": "안양터미널", "office": "안양과천교육지원청" },
+            "경기광명시": { "hub": "광명터미널", "office": "광명교육지원청" },
+            "경기시흥시": { "hub": "시흥터미널", "office": "시흥교육지원청" },
+            "경기광주시": { "hub": "광주터미널(경기)", "office": "광주하남교육지원청" },
+            "경기이천시": { "hub": "이천터미널", "office": "이천교육지원청" },
+            "경기김포시": { "hub": "김포터미널", "office": "김포교육지원청" },
+            "경기화성시": { "hub": "화성터미널", "office": "화성오산교육지원청" },
+            "경기오산시": { "hub": "오산터미널", "office": "화성오산교육지원청" },
+            "경기하남시": { "hub": "하남터미널", "office": "광주하남교육지원청" },
+            "경기의왕시": { "hub": "의왕터미널", "office": "의왕과천교육지원청" },
+            "경기군포시": { "hub": "군포터미널", "office": "군포의왕교육지원청" },
+            "경기파주시": { "hub": "파주터미널", "office": "파주교육지원청" },
+            "경기양주시": { "hub": "양주터미널", "office": "양주교육지원청" },
+            "경기구리시": { "hub": "구리터미널", "office": "구리남양주교육지원청" },
+            "경기남양주시": { "hub": "남양주터미널", "office": "구리남양주교육지원청" },
+            "경기포천시": { "hub": "포천터미널", "office": "포천교육지원청" },
+            "경기동두천시": { "hub": "동두천터미널", "office": "동두천양주교육지원청" },
+            "경기안성시": { "hub": "안성터미널", "office": "안성교육지원청" },
+            "경기여주시": { "hub": "여주터미널", "office": "여주교육지원청" },
+            "경기양평군": { "hub": "양평터미널", "office": "양평교육지원청" },
+            "경기가평군": { "hub": "가평터미널", "office": "가평교육지원청" },
+            "경기연천군": { "hub": "연천터미널", "office": "연천교육지원청" },
+            "강원춘천시": { "hub": "춘천터미널", "office": "춘천교육지원청" },
+            "강원원주시": { "hub": "원주터미널", "office": "원주교육지원청" },
+            "강원강릉시": { "hub": "강릉터미널", "office": "강릉교육지원청" },
+            "강원동해시": { "hub": "동해터미널", "office": "동해교육지원청" },
+            "강원태백시": { "hub": "태백터미널", "office": "태백교육지원청" },
+            "강원속초시": { "hub": "속초터미널", "office": "속초양양교육지원청" },
+            "강원삼척시": { "hub": "삼척터미널", "office": "삼척교육지원청" },
+            "강원홍천군": { "hub": "홍천터미널", "office": "홍천교육지원청" },
+            "강원횡성군": { "hub": "횡성터미널", "office": "횡성교육지원청" },
+            "강원영월군": { "hub": "영월터미널", "office": "영월교육지원청" },
+            "강원평창군": { "hub": "평창터미널", "office": "평창교육지원청" },
+            "강원정선군": { "hub": "정선터미널", "office": "정선교육지원청" },
+            "강원철원군": { "hub": "철원터미널", "office": "철원교육지원청" },
+            "강원화천군": { "hub": "화천터미널", "office": "화천교육지원청" },
+            "강원양구군": { "hub": "양구터미널", "office": "양구교육지원청" },
+            "강원인제군": { "hub": "인제터미널", "office": "인제교육지원청" },
+            "강원고성군": { "hub": "고성터미널(강원)", "office": "고성교육지원청" },
+            "강원양양군": { "hub": "양양터미널", "office": "속초양양교육지원청" },
+            "충북청주시": { "hub": "청주터미널", "office": "청주교육지원청" },
+            "충북충주시": { "hub": "충주터미널", "office": "충주교육지원청" },
+            "충북제천시": { "hub": "제천터미널", "office": "제천교육지원청" },
+            "충북보은군": { "hub": "보은터미널", "office": "보은교육지원청" },
+            "충북옥천군": { "hub": "옥천터미널", "office": "옥천교육지원청" },
+            "충북영동군": { "hub": "영동터미널", "office": "영동교육지원청" },
+            "충북증평군": { "hub": "증평터미널", "office": "증평교육지원청" },
+            "충북진천군": { "hub": "진천터미널", "office": "진천교육지원청" },
+            "충북괴산군": { "hub": "괴산터미널", "office": "괴산교육지원청" },
+            "충북음성군": { "hub": "음성터미널", "office": "음성교육지원청" },
+            "충북단양군": { "hub": "단양터미널", "office": "단양교육지원청" },
+            "충남천안시": { "hub": "천안터미널", "office": "천안교육지원청" },
+            "충남공주시": { "hub": "공주터미널", "office": "공주교육지원청" },
+            "충남보령시": { "hub": "보령터미널", "office": "보령교육지원청" },
+            "충남아산시": { "hub": "아산터미널", "office": "아산교육지원청" },
+            "충남서산시": { "hub": "서산터미널", "office": "서산교육지원청" },
+            "충남논산시": { "hub": "논산터미널", "office": "논산계룡교육지원청" },
+            "충남계룡시": { "hub": "계룡터미널", "office": "논산계룡교육지원청" },
+            "충남당진시": { "hub": "당진터미널", "office": "당진교육지원청" },
+            "충남금산군": { "hub": "금산터미널", "office": "금산교육지원청" },
+            "충남부여군": { "hub": "부여터미널", "office": "부여교육지원청" },
+            "충남서천군": { "hub": "서천터미널", "office": "서천교육지원청" },
+            "충남청양군": { "hub": "청양터미널", "office": "청양교육지원청" },
+            "충남홍성군": { "hub": "홍성터미널", "office": "홍성교육지원청" },
+            "충남예산군": { "hub": "예산터미널", "office": "예산교육지원청" },
+            "충남태안군": { "hub": "태안터미널", "office": "태안교육지원청" },
+            "전북전주시": { "hub": "전주터미널", "office": "전주교육지원청" },
+            "전북군산시": { "hub": "군산터미널", "office": "군산교육지원청" },
+            "전북익산시": { "hub": "익산터미널", "office": "익산교육지원청" },
+            "전북정읍시": { "hub": "정읍터미널", "office": "정읍교육지원청" },
+            "전북남원시": { "hub": "남원터미널", "office": "남원교육지원청" },
+            "전북김제시": { "hub": "김제터미널", "office": "김제교육지원청" },
+            "전북완주군": { "hub": "완주터미널", "office": "완주교육지원청" },
+            "전북진안군": { "hub": "진안터미널", "office": "진안교육지원청" },
+            "전북무주군": { "hub": "무주터미널", "office": "무주교육지원청" },
+            "전북장수군": { "hub": "장수터미널", "office": "장수교육지원청" },
+            "전북임실군": { "hub": "임실터미널", "office": "임실교육지원청" },
+            "전북순창군": { "hub": "순창터미널", "office": "순창교육지원청" },
+            "전북고창군": { "hub": "고창터미널", "office": "고창교육지원청" },
+            "전북부안군": { "hub": "부안터미널", "office": "부안교육지원청" },
+            "전남남악": { "hub": "남악터미널", "office": "전라남도교육청" },
+            "전남목포시": { "hub": "목포터미널", "office": "목포교육지원청" },
+            "전남여수시": { "hub": "여수터미널", "office": "여수교육지원청" },
+            "전남순천시": { "hub": "순천터미널", "office": "순천교육지원청" },
+            "전남나주시": { "hub": "나주터미널", "office": "나주교육지원청" },
+            "전남광양시": { "hub": "광양터미널", "office": "광양교육지원청" },
+            "전남담양군": { "hub": "담양터미널", "office": "담양교육지원청" },
+            "전남곡성군": { "hub": "곡성터미널", "office": "곡성교육지원청" },
+            "전남구례군": { "hub": "구례터미널", "office": "구례교육지원청" },
+            "전남고흥군": { "hub": "고흥터미널", "office": "고흥교육지원청" },
+            "전남보성군": { "hub": "보성터미널", "office": "보성교육지원청" },
+            "전남화순군": { "hub": "화순터미널", "office": "화순교육지원청" },
+            "전남장흥군": { "hub": "장흥터미널", "office": "장흥교육지원청" },
+            "전남강진군": { "hub": "강진터미널", "office": "강진교육지원청" },
+            "전남해남군": { "hub": "해남터미널", "office": "해남교육지원청" },
+            "전남영암군": { "hub": "영암터미널", "office": "영암교육지원청" },
+            "전남무안군": { "hub": "무안터미널", "office": "무안교육지원청" },
+            "전남함평군": { "hub": "함평터미널", "office": "함평교육지원청" },
+            "전남영광군": { "hub": "영광터미널", "office": "영광교육지원청" },
+            "전남장성군": { "hub": "장성터미널", "office": "장성교육지원청" },
+            "전남완도군": { "hub": "완도터미널", "office": "완도교육지원청" },
+            "전남진도군": { "hub": "진도터미널", "office": "진도교육지원청" },
+            "전남신안군": { "hub": "목포터미널", "office": "신안교육지원청" },
+            "경북포항시": { "hub": "포항터미널", "office": "포항교육지원청" },
+            "경북경주시": { "hub": "경주터미널", "office": "경주교육지원청" },
+            "경북김천시": { "hub": "김천터미널", "office": "김천교육지원청" },
+            "경북안동시": { "hub": "안동터미널", "office": "안동교육지원청" },
+            "경북구미시": { "hub": "구미터미널", "office": "구미교육지원청" },
+            "경북영주시": { "hub": "안동터미널", "office": "영주교육지원청" },
+            "경북영천시": { "hub": "동대구터미널", "office": "영천교육지원청" },
+            "경북상주시": { "hub": "김천터미널", "office": "상주교육지원청" },
+            "경북문경시": { "hub": "안동터미널", "office": "문경교육지원청" },
+            "경북경산시": { "hub": "동대구터미널", "office": "경산교육지원청" },
+            "경북군위군": { "hub": "동대구터미널", "office": "군위교육지원청" },
+            "경북의성군": { "hub": "안동터미널", "office": "의성교육지원청" },
+            "경북청송군": { "hub": "안동터미널", "office": "청송교육지원청" },
+            "경북영양군": { "hub": "안동터미널", "office": "영양교육지원청" },
+            "경북영덕군": { "hub": "포항터미널", "office": "영덕교육지원청" },
+            "경북청도군": { "hub": "동대구터미널", "office": "청도교육지원청" },
+            "경북고령군": { "hub": "서대구터미널", "office": "고령교육지원청" },
+            "경북성주군": { "hub": "서대구터미널", "office": "성주교육지원청" },
+            "경북칠곡군": { "hub": "동대구터미널", "office": "칠곡교육지원청" },
+            "경북예천군": { "hub": "안동터미널", "office": "예천교육지원청" },
+            "경북봉화군": { "hub": "안동터미널", "office": "봉화교육지원청" },
+            "경북울진군": { "hub": "강릉터미널", "office": "울진교육지원청" },
+            "경북울릉군": { "hub": "포항터미널", "office": "울릉교육지원청" },
+            "경남창원시": { "hub": "창원터미널", "office": "창원교육지원청" },
+            "경남진주시": { "hub": "진주터미널", "office": "진주교육지원청" },
+            "경남통영시": { "hub": "창원터미널", "office": "통영교육지원청" },
+            "경남사천시": { "hub": "진주터미널", "office": "사천교육지원청" },
+            "경남김해시": { "hub": "김해터미널", "office": "김해교육지원청" },
+            "경남밀양시": { "hub": "부산서부터미널", "office": "밀양교육지원청" },
+            "경남거제시": { "hub": "거제터미널", "office": "거제교육지원청" },
+            "경남양산시": { "hub": "양산터미널", "office": "양산교육지원청" },
+            "경남의령군": { "hub": "창원터미널", "office": "의령교육지원청" },
+            "경남함안군": { "hub": "창원터미널", "office": "함안교육지원청" },
+            "경남창녕군": { "hub": "창원터미널", "office": "창녕교육지원청" },
+            "경남고성군": { "hub": "진주터미널", "office": "고성교육지원청" },
+            "경남남해군": { "hub": "진주터미널", "office": "남해교육지원청" },
+            "경남하동군": { "hub": "진주터미널", "office": "하동교육지원청" },
+            "경남산청군": { "hub": "진주터미널", "office": "산청교육지원청" },
+            "경남함양군": { "hub": "진주터미널", "office": "함양교육지원청" },
+            "경남거창군": { "hub": "진주터미널", "office": "거창교육지원청" },
+            "경남합천군": { "hub": "창원터미널", "office": "합천교육지원청" },
+            "제주제주시": { "hub": "제주터미널", "office": "제주교육지원청" },
+            "제주서귀포시": { "hub": "서귀포터미널", "office": "서귀포교육지원청" }
+          },
+          "special_areas": {
+            "rural_bus": {
+              "자은": 2000,
+              "임자": 2000,
+              "암태": 2000,
+              "증도": 2000,
+              "지도": 2000,
+              "압해": 2000,
+              "안좌": 2000,
+              "팔금": 2000,
+              "비금": 2000,
+              "도초": 2000
+            },
+            "island": [
+              "흑산",
+              "홍도",
+              "가거도",
+              "거문",
+              "청산",
+              "소안",
+              "추자"
+            ]
+          }
+        };
+
+        const Icons = {
+            MapPin: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>,
+            Search: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" {...props}><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>,
+            X: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>,
+            Calculator: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" {...props}><rect width="16" height="20" x="4" y="2" rx="2"/><line x1="8" x2="16" y1="6" y2="6"/><path d="M16 10h.01"/><path d="M12 10h.01"/><path d="M8 10h.01"/><path d="M12 14h.01"/><path d="M8 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/></svg>,
+            Warning: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="m21.73 18-8-14a2 2 0 0 0-3.46 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg>,
+            Chat: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="m3 21 1.9-5.7a8.5 8.5 0 1 1 3.8 3.8z"/></svg>,
+            Clock: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" {...props}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        };
+
+        const REGION_ICONS = {
+            // 서울
+            "서울강동구": "🏢", "서울송파구": "🏢", "서울강남구": "🏢", "서울서초구": "🏢", "서울성동구": "🏢",
+            "서울광진구": "🏢", "서울중랑구": "🏢", "서울동대문구": "🏢", "서울성북구": "🏢", "서울강북구": "🏢",
+            "서울노원구": "🏢", "서울도봉구": "🏢", "서울중구": "🏢", "서울용산구": "🏢", "서울종로구": "🏢",
+            "서울관악구": "🏢", "서울동작구": "🏢", "서울영등포구": "🏢", "서울금천구": "🏢", "서울구로구": "🏢",
+            "서울마포구": "🏢", "서울서대문구": "🏢", "서울은평구": "🏢", "서울양천구": "🏢", "서울강서구": "🏢",
+            // 부산
+            "부산해운대구": "🌊", "부산동래구": "🌊", "부산금정구": "🌊", "부산연제구": "🌊", "부산수영구": "🌊",
+            "부산부산진구": "🌊", "부산사상구": "🌊", "부산북구": "🌊", "부산중구": "🌊", "부산서구": "🌊",
+            "부산동구": "🌊", "부산영도구": "🌊", "부산남구": "🌊", "부산강서구": "🌊", "부산기장군": "🌊",
+            // 대구
+            "대구중구": "🍎", "대구동구": "🍎", "대구서구": "🍎", "대구북구": "🍎", "대구수성구": "🍎",
+            "대구남구": "🍎", "대구달서구": "🍎", "대구달성군": "🍎",
+            // 인천
+            "인천중구": "✈️", "인천남동구": "✈️", "인천부평구": "✈️", "인천미추홀구": "✈️", "인천연수구": "✈️",
+            "인천계양구": "✈️", "인천서구": "✈️", "인천강화군": "⛵", "인천옹진군": "⛵",
+            // 광주
+            "광주동구": "🍉", "광주서구": "🍉", "광주남구": "🍉", "광주북구": "🍉", "광주광산구": "🍉",
+            // 대전
+            "대전동구": "🍞", "대전중구": "🍞", "대전서구": "🍞", "대전유성구": "🍞", "대전대덕구": "🍞",
+            // 울산
+            "울산중구": "🏭", "울산남구": "🏭", "울산동구": "🏭", "울산북구": "🏭", "울산울주군": "🏭",
+            // 세종
+            "세종세종시": "🏛️",
+            // 경기
+            "경기수원시": "🏙️", "경기성남시": "🏙️", "경기고양시": "🏙️", "경기용인시": "🏙️", "경기부천시": "🏙️",
+            "경기안산시": "🏙️", "경기평택시": "🏙️", "경기의정부시": "🏙️", "경기안양시": "🏙️", "경기광명시": "🏙️",
+            "경기시흥시": "🏙️", "경기광주시": "🏙️", "경기이천시": "🏙️", "경기김포시": "🏙️", "경기화성시": "🏙️",
+            "경기오산시": "🏙️", "경기하남시": "🏙️", "경기의왕시": "🏙️", "경기군포시": "🏙️", "경기파주시": "🏙️",
+            "경기양주시": "🏙️", "경기구리시": "🏙️", "경기남양주시": "🏙️", "경기포천시": "🌲", "경기동두천시": "🏙️",
+            "경기안성시": "🌾", "경기여주시": "🌾", "경기양평군": "🌲", "경기가평군": "🌲", "경기연천군": "🌲",
+            // 강원
+            "강원춘천시": "🌲", "강원원주시": "🌲", "강원강릉시": "🌊", "강원동해시": "🌊", "강원태백시": "⛏️",
+            "강원속초시": "🌊", "강원삼척시": "🌊", "강원홍천군": "🌲", "강원횡성군": "🌲", "강원영월군": "🪨",
+            "강원평창군": "⛷️", "강원정선군": "🪨", "강원철원군": "🌾", "강원화천군": "🌲", "강원양구군": "🌲",
+            "강원인제군": "🌲", "강원고성군": "🌊", "강원양양군": "🌊",
+            // 충북
+            "충북청주시": "🍑", "충북충주시": "🍑", "충북제천시": "🍑", "충북보은군": "🌰", "충북옥천군": "🌰",
+            "충북영동군": "🍇", "충북증평군": "🌾", "충북진천군": "🌾", "충북괴산군": "🌾", "충북음성군": "🌾",
+            "충북단양군": "🪨",
+            // 충남
+            "충남천안시": "🌰", "충남공주시": "🌰", "충남보령시": "🌊", "충남아산시": "🌰", "충남서산시": "🌊",
+            "충남논산시": "🌾", "충남계룡시": "🏛️", "충남당진시": "🏭", "충남금산군": "🌿", "충남부여군": "🏺",
+            "충남서천군": "🌊", "충남청양군": "🌾", "충남홍성군": "🌾", "충남예산군": "🍎", "충남태안군": "🌊",
+            // 전북
+            "전북전주시": "🏘️", "전북군산시": "🏘️", "전북익산시": "🏘️", "전북정읍시": "🌾", "전북남원시": "🎭",
+            "전북김제시": "🌾", "전북완주군": "🌾", "전북진안군": "⛰️", "전북무주군": "⛷️", "전북장수군": "⛰️",
+            "전북임실군": "🧀", "전북순창군": "🌶️", "전북고창군": "🫐", "전북부안군": "🌊",
+            // 전남
+            "전남목포시": "⚓", "전남여수시": "🌉", "전남순천시": "🌳", "전남나주시": "🍐", "전남광양시": "💮",
+            "전남담양군": "🎋", "전남곡성군": "🍈", "전남구례군": "⛰️", "전남고흥군": "🚀", "전남보성군": "🍵",
+            "전남화순군": "🍑", "전남장흥군": "🍄", "전남강진군": "🏺", "전남해남군": "🍠", "전남영암군": "🏁",
+            "전남무안군": "🧅", "전남함평군": "🦋", "전남영광군": "🐟", "전남장성군": "🍎", "전남완도군": "🦪",
+            "전남진도군": "🐶", "전남신안군": "👼", "전남남악": "🏛️",
+            // 경북
+            "경북포항시": "🦀", "경북경주시": "🏺", "경북김천시": "🍇", "경북안동시": "🎭", "경북구미시": "🏭",
+            "경북영주시": "🍎", "경북영천시": "🍇", "경북상주시": "🍑", "경북문경시": "⛰️", "경북경산시": "🍇",
+            "경북군위군": "🌾", "경북의성군": "🧄", "경북청송군": "🍎", "경북영양군": "🌶️", "경북영덕군": "🦀",
+            "경북청도군": "🍑", "경북고령군": "🏺", "경북성주군": "🍈", "경북칠곡군": "🌾", "경북예천군": "🌾",
+            "경북봉화군": "🌲", "경북울진군": "🌊", "경북울릉군": "🏝️",
+            // 경남
+            "경남창원시": "🌸", "경남진주시": "🏯", "경남통영시": "🚢", "경남사천시": "✈️", "경남김해시": "🏺",
+            "경남밀양시": "🌾", "경남거제시": "🚢", "경남양산시": "🏙️", "경남의령군": "🌾", "경남함안군": "🌾",
+            "경남창녕군": "🌾", "경남고성군": "🦕", "경남남해군": "🌊", "경남하동군": "🍵", "경남산청군": "⛰️",
+            "경남함양군": "⛰️", "경남거창군": "⛰️", "경남합천군": "🌾",
+            // 제주
+            "제주제주시": "🍊", "제주서귀포시": "🍊"
+        };
+
+        const RURAL_BUS_AREAS = ["자은면", "임자면", "암태면", "증도읍", "지도읍", "압해읍", "안좌면", "팔금면"];
+        const ISLAND_AREAS = {
+            nonLinked: ["비금", "흑산", "거문", "청산"], 
+            linked: ["자은면", "임자면", "암태면", "증도읍", "지도읍", "압해읍", "안좌면", "팔금면"] 
+        };
+
+        const ALLOWED_CITIES = Object.keys(REGION_ICONS);
+        const CHOSUNG = ["ㄱ","ㄲ","ㄴ","ㄷ","ㄸ","ㄹ","ㅁ","ㅂ","ㅃ","ㅅ","ㅆ","ㅇ","ㅈ","ㅉ","ㅊ","ㅋ","ㅌ","ㅍ","ㅎ"];
+        
+        const getChosungStr = (str) => {
+            let res = "";
+            for(let i=0; i<str.length; i++) {
+                const code = str.charCodeAt(i)-44032;
+                if(code > -1 && code < 11172) res += CHOSUNG[Math.floor(code/588)];
+                else res += str.charAt(i);
+            }
+            return res;
+        };
+        const fmt = (num) => Number(num).toLocaleString('ko-KR');
+
+        const parseZoneAndTag = (regionStr) => {
+            if (!regionStr || regionStr.length < 2) return { zone: "알수없음", tag: "알수없음" };
+            const sido = regionStr.substring(0, 2);
+            const sigungu = regionStr.substring(2);
+            const cleanSigungu = sigungu.replace(/[시군]$/, '');
+            let zone = "";
+            let tag = sido + cleanSigungu;
+
+            if (sido === "광주") zone = "광주권";
+            else if (sido === "전남") {
+                if (cleanSigungu.includes("남악")) zone = "무안권";
+                else zone = cleanSigungu + "권";
+            }
+            else if (sido === "서울") zone = "서울권";
+            else zone = sido + "권";
+
+            return { zone, tag };
+        };
+
+        const AutocompleteInput = ({ value, onChange, onSelect, placeholder, label }) => {
+            const [suggestions, setSuggestions] = useState([]);
+            const [show, setShow] = useState(false);
+            const [activeIndex, setActiveIndex] = useState(-1);
+            
+            useEffect(() => {
+                const val = value.replace(/\s/g,"");
+                if(!val || ALLOWED_CITIES.includes(val)) {
+                    setSuggestions([]);
+                    return;
+                }
+                const isCho = /^[ㄱ-ㅎ]+$/.test(val);
+                const match = ALLOWED_CITIES.filter(c => isCho ? getChosungStr(c).includes(val) : c.includes(val));
+                setSuggestions(match);
+                setActiveIndex(-1);
+            }, [value]);
+
+            const handleKeyDown = (e) => {
+                if (!show || suggestions.length === 0) return;
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    setActiveIndex(prev => (prev < suggestions.length - 1 ? prev + 1 : prev));
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    setActiveIndex(prev => (prev > 0 ? prev - 1 : prev));
+                } else if (e.key === 'Enter' && activeIndex >= 0) {
+                    e.preventDefault();
+                    onSelect(suggestions[activeIndex]);
+                    setShow(false);
+                }
+            };
+
+            return (
+                <div className="relative w-full group">
+                    <div className="input-group">
+                        <Icons.MapPin className="text-gray-300 group-focus-within:text-[#007AFF] transition-colors shrink-0" />
+                        <div className="flex-1 min-w-0">
+                            <label className="block text-[11px] font-extrabold text-gray-400 mb-0.5">{label}</label>
+                            <input 
+                                type="text" 
+                                className="w-full bg-transparent outline-none font-gmarket font-bold text-gray-800 text-2xl placeholder-gray-300" 
+                                placeholder={placeholder} 
+                                value={value} 
+                                onChange={e => {onChange(e.target.value); setShow(true);}} 
+                                onFocus={()=>setShow(true)} 
+                                onBlur={()=>setTimeout(()=>setShow(false), 200)}
+                                onKeyDown={handleKeyDown}
+                            />
+                        </div>
+                        <div className="w-14 flex justify-center text-4xl shrink-0">{REGION_ICONS[value] || ''}</div>
+                    </div>
+                    {show && suggestions.length > 0 && (
+                        <div className="suggestions-box">
+                            {suggestions.map((city, idx) => (
+                                <div 
+                                    key={city} 
+                                    onMouseDown={() => onSelect(city)} 
+                                    onMouseEnter={() => setActiveIndex(idx)}
+                                    className={`suggestion-item ${idx === activeIndex ? 'active' : ''}`}
+                                >
+                                    <span>{city}</span><span className="text-2xl">{REGION_ICONS[city]}</span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
-              </div>
+            );
+        };
 
-              <div className="relative">
-                <label className="block text-[10px] font-black text-gray-500 mb-1 ml-1 uppercase tracking-widest leading-none">Arrival</label>
-                <div className="relative">
-                  <select 
-                    value={endQuery}
-                    onChange={(e) => setEndQuery(e.target.value)}
-                    className="w-full h-11 bg-white border border-gray-400 rounded-xl pl-4 pr-10 text-gray-800 shadow-inner appearance-none focus:outline-none text-base font-bold transition-all"
-                  >
-                    <option value="">도착 지역 선택</option>
-                    {Object.keys(REGION_TO_OFFICE).map(r => <option key={r} value={r}>{r}</option>)}
-                  </select>
-                  <Search className="absolute right-4 top-3 text-gray-400" size={18} />
-                </div>
-              </div>
-            </div>
-
-            <button 
-              onClick={handleCalculate}
-              className="w-full h-14 bg-gradient-to-b from-[#6db3f2] via-[#54a3ee] to-[#3690f0] border border-[#2d7ad1] rounded-2xl text-white font-bold text-xl shadow-md active:opacity-80 transition-all flex items-center justify-center gap-3"
-              style={{ boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.4), 0 3px 6px rgba(0,0,0,0.2)' }}
-            >
-              조회하기
+        const Toggle = ({ checked, onChange }) => (
+            <button onClick={() => onChange(!checked)} className={`toggle-switch ${checked ? 'toggle-active' : 'toggle-inactive'}`}>
+                <span className={`toggle-knob ${checked ? 'knob-active' : ''}`} />
             </button>
+        );
 
-            {/* Out-of-Jurisdiction View */}
-            {result && result.type === 'OUT' && (
-              <div className="animate-in slide-in-from-bottom-6 duration-300">
-                <div className="bg-white border border-gray-300 rounded-[24px] overflow-hidden shadow-xl mb-6">
-                   <div className="p-4 bg-gradient-to-b from-gray-50 to-gray-100 border-b border-gray-200 flex justify-between items-center">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-blue-600">Fare</span>
-                    <span className="text-3xl font-black text-gray-900 tracking-tighter tabular-nums">{result.oneWayFare.toLocaleString()}</span>
-                  </div>
+        const App = () => {
+            const [origin, setOrigin] = useState('');
+            const [destination, setDestination] = useState('');
+            const [waypoints, setWaypoints] = useState([]); 
+            const [intraCityOpen, setIntraCityOpen] = useState(false);
+            const [result, setResult] = useState(null);
+            const [isCalculating, setIsCalculating] = useState(false); // 로딩 상태 추가
+            
+            const [expenseModalOpen, setExpenseModalOpen] = useState(false);
+            const [activeSubModal, setActiveSubModal] = useState(null); 
+            
+            const [manualTransportFare, setManualTransportFare] = useState(0); 
+            const [otherFare, setOtherFare] = useState(0); 
+            
+            const [specialRegion, setSpecialRegion] = useState({
+                isRuralBus: false, isNonLinkedIsland: false, isLinkedIsland: false, regionName: ''
+            });
+            
+            const [deductions, setDeductions] = useState({
+                gov_vehicle: false, meal_1: false, meal_2: false, meal_3: false, meal_half: false,
+                trans_proof: false, trans_gov: false, trans_passenger: false
+            });
 
-                  <button 
-                    onClick={() => setShowDetails(!showDetails)}
-                    className={`w-full p-4 flex justify-between items-center transition-all bg-[#00BFA5] text-white ${showDetails ? 'opacity-90' : 'animate-pulse'}`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <Calculator size={20} />
-                      <span className="font-bold text-lg leading-none">여비 계산기</span>
-                    </div>
-                    {!showDetails ? <ChevronDown size={24} /> : <ChevronUp size={24} />}
-                  </button>
+            const [intraDeductions, setIntraDeductions] = useState({
+                shortTime: false, govVehicle: false
+            });
 
-                  <div className={`overflow-hidden transition-all duration-500 ${showDetails ? 'max-h-[800px] border-t border-gray-100' : 'max-h-0'}`}>
-                    <div className="p-5 space-y-2 bg-gray-50">
-                      <DetailStaticRow label="일비" value={result.dailyAllowance} />
-                      <DetailStaticRow label="식비" value={result.mealAllowance} />
-                      <DetailInputRow 
-                        label="왕복교통비" 
-                        value={result.roundTripFare} 
-                        onChange={(val) => handleUpdateFare('roundTripFare', val)} 
-                      />
-                      <DetailInputRow 
-                        label="기타교통비" 
-                        value={result.otherFare} 
-                        onChange={(val) => handleUpdateFare('otherFare', val)} 
-                      />
-                      <div className="pt-3 mt-1 border-t-2 border-dashed border-gray-300 flex justify-between items-center">
-                        <span className="font-black text-[#00BFA5] text-lg uppercase tracking-tighter">Total</span>
-                        <div className="w-24 text-right pr-2">
-                          <span className="text-2xl font-black text-[#00BFA5] tabular-nums underline decoration-blue-100 underline-offset-4">{calculateTotal().toLocaleString()}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+            const [history, setHistory] = useState([]);
+            const [isHistoryOpen, setIsHistoryOpen] = useState(false);
 
-                  <div className="p-4 bg-white border-t border-gray-100">
-                    <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl shadow-inner">
-                      <div className="flex justify-between items-center mb-3 border-b border-gray-200 pb-2">
-                        <div className="flex items-center gap-2">
-                          <MapPin size={14} className="text-gray-500" />
-                          <span className="font-black text-gray-700 uppercase text-[10px] tracking-[0.1em]">Route</span>
-                        </div>
-                        <span className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase ${result.path.includes('→') && result.path.split('→').length > 2 ? 'bg-orange-100 text-orange-600' : 'bg-blue-100 text-blue-600'}`}>
-                          {result.path.includes('→') && result.path.split('→').length > 2 ? '환승' : '직통'}
-                        </span>
-                      </div>
-                      
-                      <div className="flex flex-col gap-2 px-1">
-                        {result.path.split(' → ').map((step, idx, arr) => (
-                          <div key={idx} className="flex items-center gap-3">
-                            <div className="flex flex-col items-center">
-                              <div className={`w-2.5 h-2.5 rounded-full border-2 ${idx === 0 ? 'bg-blue-500 border-blue-100' : idx === arr.length - 1 ? 'bg-red-500 border-red-100' : 'bg-gray-400 border-gray-100'}`}></div>
-                              {idx < arr.length - 1 && <div className="w-0.5 h-4 bg-gray-200"></div>}
-                            </div>
-                            <span className="text-[12px] font-black text-gray-800 tracking-tighter leading-none">{step}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
+            const TAGO_API_KEY = "47a79741c5cfeead2314a79c59b1c6114705107cc1066d9cd366a2d9333e5422";
+            const [fareData, setFareData] = useState(FARE_DATA);
 
-          {/* Modal (In-Jurisdiction) */}
-          {isInModalOpen && (
-            <div className="absolute inset-0 z-50 bg-black/75 backdrop-blur-[6px] flex items-center justify-center p-8 animate-in fade-in duration-200">
-              <div className="w-full max-w-[420px] bg-[#f5f5f5] rounded-[30px] shadow-2xl overflow-hidden border border-white/30 animate-in zoom-in-95 duration-200">
-                <div className="bg-gradient-to-b from-[#7d7d7d] to-[#222] p-4 flex justify-between items-center border-b border-black">
-                  <span className="text-white font-bold text-sm tracking-widest uppercase">Jurisdiction</span>
-                  <button onClick={closeInModal} className="text-white/60 hover:text-white transition-colors">
-                    <X size={22} />
-                  </button>
-                </div>
+            const fetchBusFareFromAPI = async (depTerminalId, arrTerminalId, busType) => {
+                const baseUrl = busType === 'express'
+                    ? "http://apis.data.go.kr/1613000/ExpBusInfoService/getStrtpntAlocFndExpbusInfo"
+                    : "http://apis.data.go.kr/1613000/SuburbsBusInfoService/getStrtpntAlocFndSuberbsBusInfo";
+                const today = new Date();
+                const depPlandTime = today.getFullYear().toString() + String(today.getMonth() + 1).padStart(2, '0') + String(today.getDate()).padStart(2, '0');
+                const queryParams = new URLSearchParams({ serviceKey: TAGO_API_KEY, pageNo: '1', numOfRows: '10', _type: 'json', depTerminalId, arrTerminalId, depPlandTime });
+                try {
+                    const res = await fetch(`${baseUrl}?${queryParams.toString()}`);
+                    const data = await res.json();
+                    const items = data?.response?.body?.items?.item;
+                    if (!items) return null;
+                    return Array.isArray(items) ? (items[0].charge || items[0].fare) : (items.charge || items.fare);
+                } catch (e) { return null; }
+            };
+
+            const getHybridFare = async (fromStr, toStr) => {
+                if (!fareData) return { fare: 0, routeKey: "데이터 없음" };
+
+                const fromNode = parseZoneAndTag(fromStr);
+                const toNode = parseZoneAndTag(toStr);
+                const routeKey = `${fromNode.zone}_${toNode.tag}`;
+
+                if (fareData.fares && fareData.fares[routeKey]) {
+                    const val = fareData.fares[routeKey].fare || fareData.fares[routeKey];
+                    return { fare: val, routeKey: routeKey };
+                }
+
+                const depHubName = fareData.region_map[fromStr]?.hub;
+                const arrHubName = fareData.region_map[toStr]?.hub;
+
+                if (depHubName && arrHubName) {
+                    const legacyKey = `${depHubName}→${arrHubName}`;
+                    if (fareData.fares[legacyKey]) {
+                        const val = fareData.fares[legacyKey].fare || fareData.fares[legacyKey];
+                        return { fare: val, routeKey: legacyKey };
+                    }
+                }
+
+                if (!fareData.region_map || !fareData.hubs) return { fare: 0, routeKey: routeKey + " (매핑 불가)" };
+                if (!depHubName || !arrHubName) return { fare: 0, routeKey: routeKey + " (터미널 없음)" };
+
+                const depInfo = fareData.hubs[depHubName];
+                const arrInfo = fareData.hubs[arrHubName];
+
+                if (!depInfo || !arrInfo) return { fare: 0, routeKey: routeKey + " (ID 없음)" };
+
+                let apiFare = null;
+                if (depInfo.express_id && arrInfo.express_id) {
+                    apiFare = await fetchBusFareFromAPI(depInfo.express_id, arrInfo.express_id, 'express');
+                }
+                if (!apiFare && depInfo.intercity_id && arrInfo.intercity_id) {
+                    apiFare = await fetchBusFareFromAPI(depInfo.intercity_id, arrInfo.intercity_id, 'intercity');
+                }
+
+                return { fare: apiFare || 0, routeKey: routeKey + (apiFare ? " (API 실시간)" : " (통신 실패)") };
+            };
+
+            useEffect(() => {
+                const saved = localStorage.getItem('yeobi_history');
+                if (saved) { try { setHistory(JSON.parse(saved)); } catch (e) {} }
+            }, []);
+
+            const addWaypoint = () => { if (waypoints.length < 3) setWaypoints([...waypoints, '']); };
+            const removeWaypoint = (index) => { setWaypoints(waypoints.filter((_, i) => i !== index)); };
+            const updateWaypoint = (index, value) => { const newWaypoints = [...waypoints]; newWaypoints[index] = value; setWaypoints(newWaypoints); };
+
+            const checkSpecialRegion = (destination) => {
+                let isRuralBus = false;
+                let isNonLinkedIsland = false;
+                let isLinkedIsland = false;
+                let regionName = '';
                 
-                <div className="p-6 space-y-4">
-                  <div className="text-center bg-white py-6 rounded-[24px] border border-gray-200 shadow-inner">
-                    <p className="text-[10px] text-gray-400 font-black uppercase tracking-[0.2em] mb-1 text-center">Base</p>
-                    <p className="text-4xl font-black text-gray-900 tracking-tighter text-center tabular-nums">{result?.fixedAllowance.toLocaleString()}</p>
-                    <p className="text-[11px] text-green-600 font-bold mt-2 uppercase text-center">{result?.offices}</p>
-                  </div>
+                RURAL_BUS_AREAS.forEach(area => {
+                    if (destination.includes(area)) { isRuralBus = true; isLinkedIsland = true; regionName = area; }
+                });
+                ISLAND_AREAS.nonLinked.forEach(island => {
+                    if (destination.includes(island)) { isNonLinkedIsland = true; regionName = island; }
+                });
+                return { isRuralBus, isNonLinkedIsland, isLinkedIsland, regionName };
+            };
 
-                  <div className="space-y-2">
-                    <label className="block text-[10px] font-black text-gray-500 uppercase tracking-[0.1em] ml-2">Deduction</label>
-                    <div className="grid grid-cols-1 gap-2">
-                      <MultiDeductionButton 
-                        active={intraDeductions.vehicle} 
-                        label="공용차량 이용 (-10,000)" 
-                        onClick={() => toggleDeduction('vehicle')} 
-                      />
-                      <MultiDeductionButton 
-                        active={intraDeductions.short} 
-                        label="4시간 미만 출장 (-10,000)" 
-                        onClick={() => toggleDeduction('short')} 
-                      />
-                    </div>
-                  </div>
+            const handleCalculate = useCallback(async () => {
+                // 방어 로직: 출발지/도착지가 비어있거나, 등록되지 않은 주소면 계산을 막아 API 과부하 방지
+                if(!origin || !destination || !fareData) {
+                    setResult(null); return;
+                }
+                if(!ALLOWED_CITIES.includes(origin) || !ALLOWED_CITIES.includes(destination)) {
+                    setResult(null); return;
+                }
 
-                  <div className="pt-4 flex justify-between items-center border-t border-gray-300 px-1">
-                    <span className="text-sm font-black text-blue-900 uppercase">Final</span>
-                    <div className="w-24 text-right pr-2">
-                      <span className="text-3xl font-black text-blue-900 tracking-tighter tabular-nums">{calculateTotal().toLocaleString()}</span>
-                    </div>
-                  </div>
-                  
-                  <button 
-                    onClick={closeInModal}
-                    className="w-full py-4 bg-gradient-to-b from-blue-500 to-blue-700 text-white font-bold rounded-2xl text-lg shadow-lg active:scale-95 transition-transform"
-                  >
-                    확정 및 닫기
-                  </button>
+                setIsCalculating(true); // 로딩 시작
+
+                // 로딩 애니메이션을 보여주기 위한 0.4초의 의도적 지연 (UX 향상)
+                await new Promise(resolve => setTimeout(resolve, 400));
+
+                const stops = [origin, ...waypoints.filter(w => w), destination];
+                const segments = [];
+                let totalFare = 0;
+                let hasAnyRuralBus = false;
+                let hasAnyNonLinkedIsland = false;
+
+                for (let i = 0; i < stops.length - 1; i++) {
+                    const fromStr = stops[i];
+                    const toStr = stops[i + 1];
+                    const special = checkSpecialRegion(toStr);
+                    
+                    const { fare: baseFare, routeKey } = await getHybridFare(fromStr, toStr);
+
+                    const ruralBusSurcharge = special.isRuralBus ? 2000 : 0;
+                    const segmentFare = Number(baseFare) + ruralBusSurcharge;
+
+                    segments.push({
+                        from: fromStr, to: toStr, fare: segmentFare,
+                        hasRuralBus: special.isRuralBus, isNonLinkedIsland: special.isNonLinkedIsland,
+                        routeKey: routeKey,
+                        startHub: fareData.region_map[fromStr]?.hub || "--",
+                        endHub: fareData.region_map[toStr]?.hub || "--"
+                    });
+
+                    totalFare += segmentFare;
+                    if (special.isRuralBus) hasAnyRuralBus = true;
+                    if (special.isNonLinkedIsland) hasAnyNonLinkedIsland = true;
+                }
+
+                const finalDestSpecial = checkSpecialRegion(destination);
+                setSpecialRegion({ isRuralBus: finalDestSpecial.isRuralBus, isNonLinkedIsland: finalDestSpecial.isNonLinkedIsland, isLinkedIsland: finalDestSpecial.isLinkedIsland, regionName: finalDestSpecial.regionName });
+
+                setResult({
+                    startHub: segments[0]?.startHub, endHub: segments[segments.length - 1]?.endHub,
+                    totalFare, segments, hasRuralBus: hasAnyRuralBus, hasMultiSegments: segments.length > 1
+                });
+                setManualTransportFare(totalFare * 2);
+
+                setHistory(prev => {
+                    const newItem = { origin, destination, waypoints: waypoints.filter(w => w) };
+                    const filtered = prev.filter(item => !(item.origin === origin && item.destination === destination));
+                    const newHistory = [newItem, ...filtered].slice(0, 10);
+                    localStorage.setItem('yeobi_history', JSON.stringify(newHistory));
+                    return newHistory;
+                });
+
+                setIsCalculating(false); // 로딩 종료
+            }, [origin, destination, waypoints, fareData]);
+
+            useEffect(() => { handleCalculate(); }, [handleCalculate]);
+
+            const handleReset = () => {
+                setDestination(''); setWaypoints([]); setResult(null); setManualTransportFare(0); setOtherFare(0);
+                setSpecialRegion({ isRuralBus: false, isNonLinkedIsland: false, isLinkedIsland: false, regionName: '' });
+                setDeductions({ gov_vehicle: false, meal_1: false, meal_2: false, meal_3: false, meal_half: false, trans_proof: false, trans_gov: false, trans_passenger: false });
+                setIntraDeductions({ shortTime: false, govVehicle: false });
+            };
+
+            const handleHistorySelect = (o, d) => { setOrigin(o); setDestination(d); setIsHistoryOpen(false); };
+
+            const getCalculatedCosts = () => {
+                if (!result) return { daily: 0, meal: 0, transport: 0, other: 0, total: 0 };
+                let daily = deductions.gov_vehicle ? 12500 : 25000;
+                let meal = deductions.meal_3 ? 0 : deductions.meal_1 ? 16670 : deductions.meal_2 ? 8340 : deductions.meal_half ? 12500 : 25000;
+                let transport = (deductions.trans_proof || deductions.trans_gov || deductions.trans_passenger) ? 0 : Number(manualTransportFare);
+                let other = Number(otherFare);
+                return { daily, meal, transport, other, total: daily + meal + transport + other };
+            };
+
+            const costs = getCalculatedCosts();
+
+            const subModalContent = {
+                daily: { title: "일비 감액", description: "현지 교통비, 통신비 등 소액 잡비 충당을 위한 정액 여비", items: [{ id: "gov_vehicle", label: "관용/임차차량 이용", sub: "" }] },
+                meal: { 
+                    title: "식비 감액", description: "여행(출장) 중 식사에 소요되는 정액 비용",
+                    items: [{ id: "meal_1", label: "1식 감액", sub: "" }, { id: "meal_2", label: "2식 감액", sub: "" }, { id: "meal_3", label: "전액 감액", sub: "" }, { id: "meal_half", label: "1/2 감액", sub: "" }],
+                    warnings: ["업무추진비+법인카드로 식사 결제 후 식비 수령 ×", "연수·워크숍 등의 주최 측 식사 제공 시 반드시 감액", "오전 관내출장 후 오후 관외출장 시 관외 식비 감액 필수"]
+                },
+                transport: { 
+                    title: "교통비 감액", description: "목적지 이동을 위해 이용한 교통수단의 실제 비용(실비 정산)",
+                    items: [{ id: "trans_proof", label: "증거서류 미제출/부적정", sub: "" }, { id: "trans_gov", label: "관용/임차차량 이용", sub: "" }, { id: "trans_passenger", label: "동승자인 경우", sub: "" }],
+                    guides: ["정식 인정: 출장지 주유 영수증(신용카드 매출전표),\n톨게이트(하이패스) 내역", "식당 영수증은 출장지에서 식사했다는 증빙,\n교통비 증빙 불가", "사진 인증샷 및 출석부는 이행 사실 소명 자료일 뿐,\n직접 증빙 ×, 본인 차량으로 이동했는지 불분명"]
+                }
+            };
+
+            return (
+                <div className="main-wrapper">
+                    <header className="header-teal">
+                        <div className="flex flex-col">
+                            <h1 className="font-gmarket font-black text-3xl text-[#007AFF] tracking-tighter">yeobi-easier</h1>
+                            <p className="text-[11px] font-extrabold text-gray-400 mt-0.5 uppercase tracking-widest">by JHN · for JNE Fellows</p>
+                        </div>
+                        <div className="mode-switch-container" onClick={() => setIntraCityOpen(!intraCityOpen)}>
+                            <div className={`mode-switch-slider ${intraCityOpen ? 'intra' : 'extra'}`}></div>
+                            <div className={`mode-text ${!intraCityOpen ? 'active' : 'inactive'}`}>관외</div>
+                            <div className={`mode-text ${intraCityOpen ? 'active' : 'inactive'}`}>관내</div>
+                        </div>
+                    </header>
+
+                    <main className="flex-1 p-6 space-y-7">
+                        {!intraCityOpen ? (
+                            <>
+                                <section className="space-y-5">
+                                    <AutocompleteInput label="출발지" placeholder="주소/상호명 입력" value={origin} onChange={setOrigin} onSelect={setOrigin} />
+                                    
+                                    {waypoints.map((waypoint, index) => (
+                                        <div key={index} className="relative">
+                                            <AutocompleteInput label={`경유지 ${index + 1}`} placeholder="주소명, 상호명 입력" value={waypoint} onChange={(val) => updateWaypoint(index, val)} onSelect={(val) => updateWaypoint(index, val)} />
+                                            <button onClick={() => removeWaypoint(index)} className="absolute top-2 right-2 w-8 h-8 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center transition-colors z-10 shadow-md"><Icons.X size={18} /></button>
+                                        </div>
+                                    ))}
+                                    
+                                    {waypoints.length < 3 && (
+                                        <button onClick={addWaypoint} className="w-full h-11 bg-gradient-to-r from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-200 text-blue-600 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 border border-blue-200 transition-all shadow-sm">
+                                            <span className="text-lg">+</span><span>경유지 추가</span>
+                                        </button>
+                                    )}
+                                    
+                                    <AutocompleteInput label="도착지" placeholder="주소/상호명 입력" value={destination} onChange={setDestination} onSelect={setDestination} />
+                                    
+                                    {/* 연산 중 상태 표시 UI */}
+                                    {isCalculating ? (
+                                        <div className="w-full h-12 bg-blue-50 text-blue-600 rounded-xl text-sm font-bold flex items-center justify-center gap-2 border border-blue-200 animate-pulse">
+                                            <svg className="animate-spin h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                                            <span>실시간 요금 연산 중...</span>
+                                        </div>
+                                    ) : (
+                                        <div className={`w-full h-12 rounded-xl text-sm font-bold flex items-center justify-center gap-2 border ${result ? 'bg-blue-50 text-blue-600 border-blue-200' : 'bg-gray-50 text-gray-500 border-gray-200'}`}>
+                                            <Icons.Search size={18} /> <span>{result ? '조회 완료' : '대기 중'}</span>
+                                        </div>
+                                    )}
+                                </section>
+
+                                <section className="bg-white rounded-[28px] shadow-[0_8px_30px_rgba(0,0,0,0.04)] border border-[#007AFF]/10 overflow-hidden min-h-[460px]">
+                                    <div className="px-7 py-6 bg-gradient-to-b from-blue-50/50 to-white flex justify-between items-center border-b border-blue-100/50">
+                                        <div className="flex flex-col">
+                                            <div className="flex items-center gap-2">
+                                                <span className="font-extrabold text-blue-800 text-lg">산출 요금</span>
+                                                <span className="text-[11px] bg-blue-100 text-blue-600 px-2 py-0.5 rounded-md uppercase tracking-tighter">One-way</span>
+                                                {specialRegion.isLinkedIsland && <span className="text-sm">🌉</span>}
+                                                {specialRegion.isNonLinkedIsland && <span className="text-sm">⛴️</span>}
+                                            </div>
+                                            {result && result.hasRuralBus && (
+                                                <div className="text-[10px] text-blue-600 font-semibold mt-1">(농어촌버스 2,000원 포함)</div>
+                                            )}
+                                        </div>
+                                        <span className={`text-4xl font-black tracking-tighter ${result ? 'text-blue-600 font-gmarket' : 'text-gray-300'}`}>
+                                            {result ? fmt(result.totalFare) : "--"}
+                                        </span>
+                                    </div>
+
+                                    <div className="flex flex-row min-h-[300px]">
+                                        <div className="w-1/2 p-6 border-r border-gray-100 relative bg-white">
+                                            <div className="map-path-area">
+                                                <div className="node-row">
+                                                    <div className={`pin-icon ${!origin && 'empty'}`}></div>
+                                                    <div className="label-container"><span className={`terminal-name ${!origin && 'text-gray-300'}`}>{origin || "출발지"}</span></div>
+                                                </div>
+                                                <div className="path-segment-line" style={{ top: '40px', height: '24px', borderLeft: '3px dashed #E5E5EA' }}></div>
+                                                <div className="node-row">
+                                                    <div className="bus-marker"><svg className={`w-3.5 h-3.5 ${result ? 'text-[#007AFF]' : 'text-gray-200'}`} viewBox="0 0 24 24" fill="currentColor"><path d="M4 16c0 .88.39 1.67 1 2.22V20c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h8v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1.78c.61-.55 1-1.34 1-2.22V6c0-3.5-3.58-4-8-4s-8 .5-8 4v10zm3.5 1c-.83 0-1.5-.67-1.5-1.5S6.67 14 7.5 14s1.5.67 1.5 1.5S8.33 17 7.5 17zm9 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm1.5-6H6V6h12v5z"/></svg></div>
+                                                    <div className="label-container"><span className={`terminal-name ${!result ? 'text-gray-200' : 'text-gray-500'}`}>{result ? result.startHub : "--"}</span></div>
+                                                </div>
+                                                <div style={{ position: 'absolute', left: '16px', top: '88px', height: '40px', width: '3px', background: result ? 'linear-gradient(to bottom, #007AFF, #5AC8FA)' : '#E5E5EA' }}></div>
+                                                <div className="floating-fare-box">
+                                                    <div className="floating-fare-badge">{result ? fmt(result.totalFare) : "--"}</div>
+                                                </div>
+                                                <div style={{ position: 'absolute', left: '16px', top: '152px', height: '40px', width: '3px', background: result ? 'linear-gradient(to bottom, #5AC8FA, #007AFF)' : '#E5E5EA' }}></div>
+                                                <div className="node-row">
+                                                    <div className="bus-marker"><svg className={`w-3.5 h-3.5 ${result ? 'text-[#007AFF]' : 'text-gray-200'}`} viewBox="0 0 24 24" fill="currentColor"><path d="M4 16c0 .88.39 1.67 1 2.22V20c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h8v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1.78c.61-.55 1-1.34 1-2.22V6c0-3.5-3.58-4-8-4s-8 .5-8 4v10zm3.5 1c-.83 0-1.5-.67-1.5-1.5S6.67 14 7.5 14s1.5.67 1.5 1.5S8.33 17 7.5 17zm9 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm1.5-6H6V6h12v5z"/></svg></div>
+                                                    <div className="label-container"><span className={`terminal-name ${!result ? 'text-gray-200' : 'text-gray-500'}`}>{result ? result.endHub : "--"}</span></div>
+                                                </div>
+                                                <div className="path-segment-line" style={{ top: '216px', height: '24px', borderLeft: '3px dashed #E5E5EA' }}></div>
+                                                <div className="node-row">
+                                                    <div className={`pin-icon dest ${!destination && 'empty'}`}></div>
+                                                    <div className="label-container"><span className={`terminal-name ${!destination && 'text-gray-300'}`}>{destination || "도착지"}</span></div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="w-1/2 p-6 bg-gradient-to-br from-blue-50/30 to-white flex flex-col justify-center space-y-7 border-l border-gray-100">
+                                            <div>
+                                                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">Data Source</span>
+                                                <span className={`text-[13px] font-black mt-1 block ${result ? 'text-[#007AFF]' : 'text-gray-300'}`}>국토교통부 (TAGO)</span>
+                                            </div>
+                                            {/* 상태 배지 수정 (로딩 중 주황색 표시) */}
+                                            <div>
+                                                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">Status</span>
+                                                <div className="flex items-center mt-1.5">
+                                                    <div className={`w-2 h-2 rounded-full mr-2 ${isCalculating ? 'bg-orange-500 animate-pulse' : (result ? 'bg-green-500' : 'bg-gray-200')}`}></div>
+                                                    <span className={`text-[12px] font-extrabold uppercase ${isCalculating ? 'text-orange-600' : (result ? 'text-green-700' : 'text-gray-300')}`}>
+                                                        {isCalculating ? 'Calculating...' : (result ? 'API Connected' : 'Waiting...')}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <button 
+                                                onClick={() => result && setExpenseModalOpen(true)} 
+                                                className={`btn-3d-teal ${!result && 'btn-3d-disabled'}`}
+                                            >
+                                                <Icons.Calculator size={22} /><span>여비계산</span>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {result && result.hasMultiSegments && result.segments && (
+                                        <div className="px-6 py-4 bg-gradient-to-b from-gray-50 to-white border-t border-gray-100">
+                                            <div className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
+                                                <span>📍</span>
+                                                <span>구간별 요금 상세</span>
+                                            </div>
+                                            <div className="space-y-2">
+                                                {result.segments.map((segment, idx) => (
+                                                    <div key={idx} className="flex items-center justify-between py-2 px-3 bg-white rounded-lg border border-gray-100">
+                                                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                                                            <span className="text-xs font-bold text-gray-400">#{idx + 1}</span>
+                                                            <div className="flex flex-col justify-center min-w-0">
+                                                                <div className="text-sm font-semibold text-gray-700 truncate">{segment.from} → {segment.to}</div>
+                                                                <div className="text-[10px] text-gray-400 mt-0.5">Key: {segment.routeKey}</div>
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex flex-col items-end ml-2">
+                                                            <span className="text-base font-bold text-blue-600">{fmt(segment.fare)}</span>
+                                                            {segment.hasRuralBus && (
+                                                                <span className="text-[9px] text-blue-500">+농어촌버스</span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {specialRegion.isNonLinkedIsland && result && (
+                                        <div className="px-6 py-4 bg-gradient-to-r from-red-50 to-orange-50 border-t border-red-100">
+                                            <div className="flex items-start gap-3">
+                                                <span className="text-xl mt-0.5">⛴️</span>
+                                                <div>
+                                                    <div className="text-sm font-bold text-red-700 mb-1">미연륙 도서 지역</div>
+                                                    <div className="text-xs text-red-600 leading-relaxed">
+                                                        * 도서 지역입니다. 여객선 운임은 승선권을 직접 확인하고 입력하세요.
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <div className="px-8 pb-6 pt-4 border-t border-gray-100 flex justify-between items-center relative">
+                                        <button onClick={() => window.open('https://padlet.com/jbyhee/hyonu-s-padlet-4m26339lwedx23dc', '_blank')} className="bottom-side-btn"><Icons.Chat /></button>
+                                        <button onClick={handleReset} className="iphone-classic-home-btn" />
+                                        <button onClick={() => setIsHistoryOpen(true)} className="bottom-side-btn"><Icons.Clock /></button>
+                                    </div>
+                                </section>
+                            </>
+                        ) : (
+                            <div className="bg-white rounded-[28px] shadow-[0_8px_30px_rgba(0,0,0,0.04)] border border-[#007AFF]/10 overflow-hidden animate-slide-up">
+                                <div className="px-7 py-6 bg-gradient-to-b from-blue-50/50 to-white border-b border-blue-100/50 flex justify-between items-start">
+                                    <div>
+                                        <h3 className="font-bold text-xl text-gray-900">관내 여비</h3>
+                                        <p className="text-xs text-gray-500 mt-1">2㎞ 이상, 같은 시·군 내의 출장 등</p>
+                                    </div>
+                                    <button onClick={() => setIntraCityOpen(false)} className="p-1.5 text-gray-400 bg-gray-100 rounded-full shrink-0">
+                                        <Icons.X size={20} />
+                                    </button>
+                                </div>
+                                <div className="p-6">
+                                    <div className="mb-6 p-4 bg-blue-50 rounded-xl border border-blue-100 text-sm font-medium text-gray-600 leading-relaxed break-keep">
+                                        근무지 내의 출장은 별도의 영수증 증빙 없이 정액 지급됩니다.
+                                    </div>
+                                    <div className="space-y-4 border-t border-b border-gray-100 py-6">
+                                        <div className="flex justify-between items-center">
+                                            <div>
+                                                <span className="text-base font-bold text-gray-700">4시간 미만 출장</span>
+                                                <span className="text-xs text-gray-500 block mt-1">10,000원 감액</span>
+                                            </div>
+                                            <Toggle checked={intraDeductions.shortTime} onChange={(val) => setIntraDeductions(p => ({...p, shortTime: val}))} />
+                                        </div>
+                                        <div className="flex justify-between items-center pt-4 border-t border-gray-50">
+                                            <div>
+                                                <span className="text-base font-bold text-gray-700">공용/임차차량 이용</span>
+                                                <span className="text-xs text-gray-500 block mt-1">10,000원 감액</span>
+                                            </div>
+                                            <Toggle checked={intraDeductions.govVehicle} onChange={(val) => setIntraDeductions(p => ({...p, govVehicle: val}))} />
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="mt-8">
+                                        <div className="flex justify-between items-end mb-8 px-2">
+                                            <span className="text-lg font-bold text-gray-800">지급액</span>
+                                            <span className="text-4xl font-black text-[#007AFF] font-gmarket">{fmt(20000 - (intraDeductions.shortTime ? 10000 : 0) - (intraDeductions.govVehicle ? 10000 : 0))}원</span>
+                                        </div>
+                                        <button 
+                                            className="btn-3d-teal w-full"
+                                            onClick={() => setIntraCityOpen(false)}
+                                        >
+                                            확인
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </main>
+
+                    {/* 여비계산 모달 */}
+                    {expenseModalOpen && (
+                        <div className="fixed inset-0 z-[120] flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm animate-fade-in" onClick={() => setExpenseModalOpen(false)}>
+                            <div className="bg-white w-full max-w-md rounded-t-[36px] sm:rounded-[36px] shadow-[0_12px_40px_rgba(0,0,0,0.08)] animate-slide-up overflow-hidden pb-10 sm:pb-0" onClick={e => e.stopPropagation()}>
+                                <div className="p-7 pb-5 flex justify-between items-center border-b border-gray-100">
+                                    <h3 className="font-gmarket font-black text-2xl text-gray-800 flex items-center gap-3"><Icons.Calculator size={28} className="text-[#007AFF]" /> 여비계산</h3>
+                                    <button onClick={() => setExpenseModalOpen(false)} className="p-1.5 text-gray-400 bg-gray-100 rounded-full"><Icons.X size={22} /></button>
+                                </div>
+                                <div className="p-8 space-y-7">
+                                    <div className="grid grid-cols-[90px_1fr_140px] items-center gap-4 min-h-[56px] py-1">
+                                        <span className="font-black text-gray-800 text-xl text-left font-pretendard">일비</span>
+                                        <div className="flex justify-center"><button onClick={()=>setActiveSubModal('daily')} className={`deduct-btn-mini ${deductions.gov_vehicle ? 'active':''}`}>감액</button></div>
+                                        <div className="flex flex-col items-end justify-center w-full">
+                                            <div className="text-2xl font-bold text-gray-800 font-pretendard leading-none">{fmt(costs.daily)}</div>
+                                            {(25000 - costs.daily) > 0 && <div className="text-[13px] text-red-500 font-bold mt-1.5 leading-none tracking-tighter">- {fmt(25000 - costs.daily)}</div>}
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-[90px_1fr_140px] items-center gap-4 min-h-[56px] py-1 pt-5 border-t border-gray-50">
+                                        <span className="font-black text-gray-800 text-xl text-left font-pretendard">식비</span>
+                                        <div className="flex justify-center"><button onClick={()=>setActiveSubModal('meal')} className={`deduct-btn-mini ${(deductions.meal_1||deductions.meal_2||deductions.meal_3||deductions.meal_half) ? 'active':''}`}>감액</button></div>
+                                        <div className="flex flex-col items-end justify-center w-full">
+                                            <div className="text-2xl font-bold text-gray-800 font-pretendard leading-none">{fmt(costs.meal)}</div>
+                                            {(25000 - costs.meal) > 0 && <div className="text-[13px] text-red-500 font-bold mt-1.5 leading-none tracking-tighter">- {fmt(25000 - costs.meal)}</div>}
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-[90px_1fr_140px] items-center gap-4 min-h-[56px] py-1 pt-5 border-t border-gray-50">
+                                        <span className="font-black text-gray-800 text-xl text-left tracking-tighter font-pretendard">교통비</span>
+                                        <div className="flex justify-center"><button onClick={()=>setActiveSubModal('transport')} className={`deduct-btn-mini ${(deductions.trans_proof||deductions.trans_gov||deductions.trans_passenger) ? 'active':''}`}>감액</button></div>
+                                        { (deductions.trans_proof || deductions.trans_gov || deductions.trans_passenger) ? (
+                                            <div className="text-2xl font-bold text-gray-300 font-pretendard text-right leading-none w-full">0</div>
+                                        ) : (
+                                            <div className="flex flex-col items-end w-full">
+                                                <input type="tel" value={manualTransportFare === 0 ? '' : fmt(manualTransportFare)} onFocus={(e) => e.target.select()} onChange={(e)=>{ const val = e.target.value.replace(/[^0-9]/g,''); if(val.length <= 6) setManualTransportFare(Number(val)); }} className="fare-box-input font-pretendard" placeholder="0" />
+                                                <div className="text-[10px] text-gray-400 mt-1 ml-1">* 실제 소요액에 따라 수정 가능</div>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="grid grid-cols-[90px_1fr_140px] items-center gap-4 min-h-[56px] py-1 pt-5 border-t border-gray-50">
+                                        <span className="font-black text-gray-800 text-lg text-left tracking-tighter leading-none font-pretendard whitespace-nowrap">기타교통비</span>
+                                        <div className="flex justify-center"></div>
+                                        <div className="flex flex-col items-end w-full">
+                                            <input type="tel" value={otherFare === 0 ? '' : fmt(otherFare)} onFocus={(e) => e.target.select()} onChange={(e)=>{ const val = e.target.value.replace(/[^0-9]/g,''); if(val.length <= 6) setOtherFare(Number(val)); }} className="fare-box-input font-pretendard" placeholder="0" />
+                                            <div className="text-[10px] text-gray-400 mt-1 ml-1">* 여객선 운임 등을 직접 입력</div>
+                                        </div>
+                                    </div>
+                                    <div className="pt-8 border-t-2 border-gray-900 flex justify-between items-center">
+                                        <span className="font-black text-gray-900 text-2xl tracking-tighter uppercase font-gmarket">Total</span>
+                                        <span className="text-4xl font-black text-[#007AFF] font-gmarket tracking-tighter">{fmt(costs.total)}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 세부 감액 옵션 모달 */}
+                    {activeSubModal && (
+                        <div className="fixed inset-0 z-[130] flex items-center justify-center p-5 bg-black/60 backdrop-blur-sm animate-fade-in" onClick={() => setActiveSubModal(null)}>
+                            <div className="bg-white rounded-[32px] w-full max-w-sm shadow-[0_12px_40px_rgba(0,0,0,0.08)] overflow-hidden animate-slide-up max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+                                <div className="bg-gradient-to-b from-blue-50 to-white px-6 py-4 border-b border-gray-100 sticky top-0 z-10">
+                                    <div className="flex justify-between items-center">
+                                        <div><h4 className="font-black text-gray-800 text-lg">{subModalContent[activeSubModal].title}</h4><p className="text-xs text-gray-500 mt-1">{subModalContent[activeSubModal].description}</p></div>
+                                        <button onClick={() => setActiveSubModal(null)} className="text-gray-400 p-1 bg-gray-100 rounded-full shrink-0 ml-2"><Icons.X size={20}/></button>
+                                    </div>
+                                </div>
+                                <div className="px-6 py-4">
+                                    {subModalContent[activeSubModal].warnings && (
+                                        <div className="warning-box" style={{ marginTop: 0, marginBottom: '16px', padding: '12px 16px' }}>
+                                            <div className="warning-title"><Icons.Warning style={{ color: '#FF9500' }} />감사 주의사항</div>
+                                            {subModalContent[activeSubModal].warnings.map((warning, idx) => <div key={idx} className="warning-item">{warning}</div>)}
+                                        </div>
+                                    )}
+                                    {subModalContent[activeSubModal].guides && (
+                                        <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 mb-4">
+                                            <div className="text-xs font-bold text-blue-800 mb-2">증빙 가이드</div>
+                                            {subModalContent[activeSubModal].guides.map((guide, idx) => (
+                                                <div key={idx} className="text-[12px] text-blue-700 leading-relaxed mb-1.5 flex items-start"><span className="mr-1.5 mt-[1px] font-bold">•</span><div>{guide.split('\n').map((line, i, arr) => <React.Fragment key={i}>{line}{i < arr.length - 1 && <br />}</React.Fragment>)}</div></div>
+                                            ))}
+                                        </div>
+                                    )}
+                                    <div className="space-y-0 mb-4">
+                                        {subModalContent[activeSubModal].items.map((item, idx) => (
+                                            <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: idx < subModalContent[activeSubModal].items.length - 1 ? '0.5px solid var(--ios-separator)' : 'none' }}>
+                                                <div><div style={{ fontSize: '16px', fontWeight: '700', marginBottom: item.sub ? '4px' : '0' }}>{item.label}</div>{item.sub && <div style={{ fontSize: '13px', color: '#8E8E93' }}>{item.sub}</div>}</div>
+                                                <Toggle checked={deductions[item.id]} onChange={() => setDeductions(prev => {
+                                                        const next = { ...prev };
+                                                        if (activeSubModal === 'meal') { ['meal_1', 'meal_2', 'meal_3', 'meal_half'].forEach(k => { if (k !== item.id) next[k] = false; }); }
+                                                        next[item.id] = !prev[item.id];
+                                                        if (item.id === 'gov_vehicle') next.trans_gov = next.gov_vehicle; else if (item.id === 'trans_gov') next.gov_vehicle = next.trans_gov;
+                                                        return next;
+                                                    })} />
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <button className="btn-3d-teal w-full" onClick={() => setActiveSubModal(null)} style={{ marginTop: '16px' }}>확인</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 히스토리 모달 */}
+                    {isHistoryOpen && (
+                        <div className="fixed inset-0 z-[120] flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm animate-fade-in" onClick={() => setIsHistoryOpen(false)}>
+                            <div className="bg-white w-full max-w-md rounded-t-[36px] sm:rounded-[36px] shadow-[0_12px_40px_rgba(0,0,0,0.08)] animate-slide-up overflow-hidden pb-10 sm:pb-0" onClick={e => e.stopPropagation()}>
+                                <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gradient-to-b from-gray-50 to-white">
+                                    <h3 className="font-gmarket font-black text-xl text-gray-800 flex items-center gap-2"><Icons.Clock size={22} className="text-[#007AFF]" /> 최근 검색 기록</h3>
+                                    <button onClick={() => setIsHistoryOpen(false)} className="p-1.5 text-gray-400 bg-gray-100 rounded-full"><Icons.X size={20} /></button>
+                                </div>
+                                <div className="max-h-[350px] overflow-y-auto">
+                                    {history.length === 0 ? <div className="p-10 text-center text-gray-400 font-medium">최근 검색 기록이 없습니다.</div> : (
+                                        history.map((h, i) => (
+                                            <div key={i} className="px-6 py-4 border-b border-gray-50 flex items-center justify-between cursor-pointer hover:bg-gray-50 active:bg-blue-50 transition-colors" onClick={() => handleHistorySelect(h.origin, h.destination)}>
+                                                <div className="flex items-center gap-4"><span className="text-gray-800 font-bold text-lg">{h.origin}</span><span className="text-gray-300">→</span><span className="text-gray-800 font-bold text-lg">{h.destination}</span></div>
+                                                <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center"><Icons.Search size={16} className="text-[#007AFF]" /></div>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
-              </div>
-            </div>
-          )}
-        </div>
+            );
+        };
 
-        {/* Home Button Container - 클릭 시 출발지 제외 초기화 */}
-        <div 
-          onClick={handleHomeReset}
-          className="h-[70px] bg-black flex items-center justify-center border-t border-[#111] shrink-0 cursor-pointer active:opacity-70 transition-opacity"
-        >
-          <div className="w-14 h-14 rounded-full border-[3px] border-[#222] flex items-center justify-center">
-            <div className="w-5 h-5 border-[2px] border-[#222] rounded-[6px]"></div>
-          </div>
-        </div>
-      </div>
-
-      <style jsx>{`
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #bbb; border-radius: 10px; }
-      `}</style>
-    </div>
-  );
-};
-
-const DetailStaticRow = ({ label, value }) => (
-  <div className="flex justify-between items-center h-10 border-b border-gray-100 last:border-0">
-    <span className="text-gray-500 font-bold text-[12px] uppercase">{label}</span>
-    <div className="w-24 text-right pr-2">
-      <span className="font-black text-gray-800 text-lg tabular-nums">{value.toLocaleString()}</span>
-    </div>
-  </div>
-);
-
-const DetailInputRow = ({ label, value, onChange }) => (
-  <div className="flex justify-between items-center h-10 border-b border-gray-100 last:border-0">
-    <span className="text-gray-500 font-bold text-[12px] uppercase">{label}</span>
-    <div className="w-24 flex justify-end">
-      <input 
-        type="text" 
-        value={value.toLocaleString()} 
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full text-right font-black text-gray-900 bg-white border border-gray-300 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[#00BFA5] shadow-inner text-lg tabular-nums"
-        maxLength={7}
-      />
-    </div>
-  </div>
-);
-
-const MultiDeductionButton = ({ active, label, onClick }) => (
-  <button 
-    onClick={onClick}
-    className={`w-full flex justify-between items-center px-4 py-3 rounded-xl border-2 text-[13px] font-black transition-all ${
-      active 
-        ? 'bg-blue-50 border-blue-500 text-blue-700 shadow-sm' 
-        : 'bg-white border-gray-200 text-gray-400'
-    }`}
-  >
-    <span>{label}</span>
-    {active ? <Check size={18} className="text-blue-600" /> : <div className="w-4 h-4 rounded-full border border-gray-100"></div>}
-  </button>
-);
-
-export default App;
-
+        window.onload = () => {
+            const rootElement = document.getElementById('root');
+            if (rootElement) {
+                const root = ReactDOM.createRoot(rootElement);
+                root.render(<App />);
+            }
+        };
+    </script>
+</body>
+</html>
